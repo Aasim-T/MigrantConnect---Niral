@@ -5,96 +5,39 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MapPin, AlertCircle, Search, ArrowRight } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { useState } from "react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { MapPin, AlertCircle, Search, ArrowRight, IndianRupee, Briefcase } from "lucide-react"
+import { useSession } from "@/components/session-provider"
+import { inr, timeAgo, useApi } from "@/lib/api"
+
+const initials = (name: string) =>
+  name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
 
 export default function WorkerDashboard() {
-  const [showApplicationDetails, setShowApplicationDetails] = useState(false)
-  const [selectedApplication, setSelectedApplication] = useState<any>(null)
+  const { user: worker } = useSession()
+  const jobs = useApi<{ jobs: any[] }>("/api/jobs?recommended=1")
+  const apps = useApi<{ applications: any[] }>("/api/applications")
+  const grievances = useApi<{ grievances: any[] }>("/api/grievances")
+  const wages = useApi<{ employments: any[] }>("/api/wages")
+  const welfare = useApi<{ schemes: any[] }>("/api/welfare")
 
-  // Mock data for worker dashboard
-  const worker = {
-    name: "Vishaal Maria Anto",
-    id: "MIG-12345",
-    location: "Delhi, India",
-    skills: ["Construction", "Carpentry", "Painting"],
-    profileCompletion: 85,
-  }
+  const activeApps = (apps.data?.applications || []).filter((a) => a.status !== "Rejected").slice(0, 3)
+  const openGrievances = (grievances.data?.grievances || []).filter((g) => g.status !== "Resolved").slice(0, 3)
+  const eligibleSchemes = (welfare.data?.schemes || []).filter((s) => s.eligibility_check?.eligible && !s.application).slice(0, 2)
+  const employments = wages.data?.employments || []
+  const pending = employments.reduce((s, e) => s + e.pendingAmount, 0)
+  const paid = employments.reduce((s, e) => s + e.totalPaid, 0)
 
-  const jobRecommendations = [
-    {
-      id: 1,
-      title: "Construction Worker",
-      company: "ABC Builders",
-      location: "Delhi",
-      salary: "₹15,000 - ₹18,000/month",
-      postedDate: "2 days ago",
-    },
-    {
-      id: 2,
-      title: "Carpenter",
-      company: "XYZ Interiors",
-      location: "Gurgaon",
-      salary: "₹18,000 - ₹22,000/month",
-      postedDate: "1 day ago",
-    },
-    {
-      id: 3,
-      title: "Painter",
-      company: "Modern Homes",
-      location: "Noida",
-      salary: "₹16,000 - ₹20,000/month",
-      postedDate: "3 days ago",
-    },
-  ]
-
-  const activeApplications = [
-    {
-      id: 101,
-      title: "Construction Helper",
-      company: "Metro Projects",
-      status: "Applied",
-      appliedDate: "5 days ago",
-      jobDescription:
-        "Assist in construction activities including material handling, site cleanup, and basic construction tasks.",
-      location: "Delhi",
-      salary: "₹14,000 - ₹16,000/month",
-      workingHours: "8 hours/day, 6 days/week",
-      contactPerson: "Amit Sharma",
-      contactEmail: "amit.sharma@metroprojects.com",
-      applicationNotes: "Highlighted previous experience in construction work.",
-    },
-    {
-      id: 102,
-      title: "Carpenter Assistant",
-      company: "Home Solutions",
-      status: "Selected",
-      appliedDate: "2 weeks ago",
-      jobDescription: "Assist the lead carpenter in furniture making, repairs, and installations.",
-      location: "Gurgaon",
-      salary: "₹16,000 - ₹18,000/month",
-      workingHours: "9 hours/day, 5 days/week",
-      contactPerson: "Rahul Verma",
-      contactEmail: "rahul.verma@homesolutions.com",
-      applicationNotes: "Mentioned carpentry skills and experience with various tools.",
-    },
-  ]
-
-  const grievances = [
-    {
-      id: 201,
-      title: "Delayed Payment",
-      company: "Previous Employer",
-      status: "In Progress",
-      filedDate: "1 week ago",
-    },
-  ]
-
-  const viewApplicationDetails = (application: any) => {
-    setSelectedApplication(application)
-    setShowApplicationDetails(true)
-  }
+  const completion = Math.round(
+    ([worker.name, worker.dob, worker.phone, worker.address, worker.location, worker.education, worker.photo].filter(Boolean).length +
+      (worker.skills?.length ? 1 : 0) +
+      (worker.languages?.length ? 1 : 0)) *
+      (100 / 9),
+  )
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -110,36 +53,34 @@ export default function WorkerDashboard() {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-1">
-        <Card className="col-span-1 lg:col-span-1">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="md:col-span-1">
           <CardHeader className="flex flex-row items-center gap-4">
             <Avatar className="h-16 w-16">
-              <AvatarImage src="/placeholder.svg?height=64&width=64" alt={worker.name} />
-              <AvatarFallback>
-                {worker.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")}
-              </AvatarFallback>
+              {worker.photo && <AvatarImage src={worker.photo} alt={worker.name} />}
+              <AvatarFallback>{initials(worker.name)}</AvatarFallback>
             </Avatar>
             <div>
               <CardTitle>{worker.name}</CardTitle>
               <CardDescription>ID: {worker.id}</CardDescription>
-              <div className="flex items-center mt-1 text-sm text-muted-foreground">
-                <MapPin className="mr-1 h-3 w-3" /> {worker.location}
-              </div>
+              {worker.location && (
+                <div className="flex items-center mt-1 text-sm text-muted-foreground">
+                  <MapPin className="mr-1 h-3 w-3" /> {worker.location}
+                </div>
+              )}
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="text-sm font-medium">Skills</div>
-              <div className="flex flex-wrap gap-2">
-                {worker.skills.map((skill) => (
-                  <Badge key={skill} variant="secondary">
-                    {skill}
-                  </Badge>
-                ))}
-              </div>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {worker.skills.map((skill: string) => (
+                <Badge key={skill} variant="secondary">
+                  {skill}
+                </Badge>
+              ))}
+            </div>
+            <div className="text-xs text-muted-foreground">Profile {Math.min(100, completion)}% complete</div>
+            <div className="h-2 rounded bg-muted">
+              <div className="h-2 rounded bg-primary" style={{ width: `${Math.min(100, completion)}%` }} />
             </div>
           </CardContent>
           <CardFooter>
@@ -150,26 +91,82 @@ export default function WorkerDashboard() {
             </Link>
           </CardFooter>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base font-medium">Wages</CardTitle>
+            <IndianRupee className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {wages.loading ? (
+              <Skeleton className="h-16" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{inr(paid)}</div>
+                <p className="text-xs text-muted-foreground">received so far</p>
+                <div className="mt-3 text-sm">
+                  Pending: <span className={pending ? "font-semibold text-orange-600" : ""}>{inr(pending)}</span>
+                </div>
+              </>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Link href="/wages" className="w-full">
+              <Button variant="outline" className="w-full" size="sm">
+                Wage details
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base font-medium">Current Work</CardTitle>
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {employments.filter((e) => e.status === "Active").length === 0 ? (
+              <p className="text-sm text-muted-foreground">Not currently employed through MigrantConnect.</p>
+            ) : (
+              employments
+                .filter((e) => e.status === "Active")
+                .map((e) => (
+                  <div key={e.id} className="text-sm">
+                    <div className="font-medium">{e.title}</div>
+                    <div className="text-muted-foreground">
+                      {e.employerName} · {inr(e.dailyWage)}/day
+                    </div>
+                  </div>
+                ))
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Job Recommendations</CardTitle>
-            <CardDescription>Based on your skills and experience</CardDescription>
+            <CardDescription>Based on your skills and location</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {jobRecommendations.map((job) => (
+            {jobs.loading && <Skeleton className="h-24" />}
+            {!jobs.loading && (jobs.data?.jobs.length || 0) === 0 && (
+              <p className="text-sm text-muted-foreground">No new jobs match your skills right now. Add more skills in your profile.</p>
+            )}
+            {(jobs.data?.jobs || []).slice(0, 3).map((job) => (
               <div key={job.id} className="flex flex-col space-y-2 rounded-lg border p-3">
                 <div className="flex justify-between">
                   <div className="font-medium">{job.title}</div>
-                  <Badge variant="outline">{job.postedDate}</Badge>
+                  <Badge variant="outline">{timeAgo(job.postedAt)}</Badge>
                 </div>
                 <div className="text-sm">{job.company}</div>
                 <div className="flex items-center text-sm text-muted-foreground">
                   <MapPin className="mr-1 h-3 w-3" /> {job.location}
                 </div>
-                <div className="text-sm font-medium">{job.salary}</div>
+                <div className="text-sm font-medium">
+                  {inr(job.salaryMin)} - {inr(job.salaryMax)}/month
+                </div>
                 <div className="flex justify-end">
                   <Link href={`/jobs/${job.id}`}>
                     <Button size="sm">View Job</Button>
@@ -193,22 +190,16 @@ export default function WorkerDashboard() {
             <CardDescription>Track your job applications</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeApplications.map((application) => (
-              <div key={application.id} className="flex flex-col space-y-2 rounded-lg border p-3">
-                <div className="flex justify-between">
-                  <div className="font-medium">{application.title}</div>
-                  <Badge variant={application.status === "Selected" ? "default" : "secondary"}>
-                    {application.status}
-                  </Badge>
+            {!apps.loading && activeApps.length === 0 && <p className="text-sm text-muted-foreground">No applications yet.</p>}
+            {activeApps.map((a) => (
+              <Link key={a.id} href={`/jobs/${a.jobId}`} className="flex flex-col space-y-1 rounded-lg border p-3 hover:bg-muted/50">
+                <div className="flex justify-between gap-2">
+                  <div className="font-medium">{a.job?.title}</div>
+                  <Badge variant={a.status === "Selected" ? "default" : "secondary"}>{a.status}</Badge>
                 </div>
-                <div className="text-sm">{application.company}</div>
-                <div className="text-xs text-muted-foreground">Applied {application.appliedDate}</div>
-                <div className="flex justify-end">
-                  <Button size="sm" variant="outline" onClick={() => viewApplicationDetails(application)}>
-                    View Details
-                  </Button>
-                </div>
-              </div>
+                <div className="text-sm">{a.job?.company}</div>
+                <div className="text-xs text-muted-foreground">Applied {timeAgo(a.appliedAt)}</div>
+              </Link>
             ))}
           </CardContent>
           <CardFooter>
@@ -228,19 +219,19 @@ export default function WorkerDashboard() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="space-y-4">
-            {grievances.length > 0 ? (
-              grievances.map((grievance) => (
-                <div key={grievance.id} className="flex flex-col space-y-2 rounded-lg border p-3">
-                  <div className="flex justify-between">
-                    <div className="font-medium">{grievance.title}</div>
-                    <Badge variant={grievance.status === "Resolved" ? "default" : "outline"}>{grievance.status}</Badge>
+            {openGrievances.length > 0 ? (
+              openGrievances.map((g) => (
+                <Link key={g.id} href={`/grievances/${g.id}`} className="flex flex-col space-y-1 rounded-lg border p-3 hover:bg-muted/50">
+                  <div className="flex justify-between gap-2">
+                    <div className="font-medium">{g.title}</div>
+                    <Badge variant="outline">{g.status}</Badge>
                   </div>
-                  <div className="text-sm">{grievance.company}</div>
-                  <div className="text-xs text-muted-foreground">Filed {grievance.filedDate}</div>
-                </div>
+                  <div className="text-sm">{g.employerName}</div>
+                  <div className="text-xs text-muted-foreground">Filed {timeAgo(g.filedAt)}</div>
+                </Link>
               ))
             ) : (
-              <div className="text-center py-4 text-sm text-muted-foreground">No active grievances</div>
+              <div className="text-center py-4 text-sm text-muted-foreground">No open grievances</div>
             )}
           </CardContent>
           <CardFooter>
@@ -255,33 +246,23 @@ export default function WorkerDashboard() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Welfare Schemes</CardTitle>
-            <CardDescription>Government schemes you may be eligible for</CardDescription>
+            <CardDescription>Government schemes you are eligible for</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="rounded-lg border p-3">
-                <div className="font-medium">PM-KISAN Scheme</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Income support of ₹6,000 per year for eligible farmer families
-                </div>
+          <CardContent className="space-y-4">
+            {!welfare.loading && eligibleSchemes.length === 0 && (
+              <p className="text-sm text-muted-foreground">No new eligible schemes. Check the full list for details.</p>
+            )}
+            {eligibleSchemes.map((s) => (
+              <div key={s.id} className="rounded-lg border p-3">
+                <div className="font-medium">{s.name}</div>
+                <div className="text-sm text-muted-foreground mt-1">{s.benefits}</div>
                 <div className="mt-2 flex justify-end">
-                  <Link href="/welfare">
+                  <Link href={`/welfare?scheme=${s.id}`}>
                     <Button size="sm">Apply Now</Button>
                   </Link>
                 </div>
               </div>
-              <div className="rounded-lg border p-3">
-                <div className="font-medium">Pradhan Mantri Awas Yojana</div>
-                <div className="text-sm text-muted-foreground mt-1">Housing subsidy for construction of houses</div>
-                <div className="mt-2 flex justify-end">
-                  <Link href="/welfare">
-                    <Button size="sm" variant="outline">
-                      Check Eligibility
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
+            ))}
           </CardContent>
           <CardFooter>
             <Link href="/welfare" className="w-full">
@@ -292,74 +273,6 @@ export default function WorkerDashboard() {
           </CardFooter>
         </Card>
       </div>
-
-      {/* Application Details Dialog */}
-      <Dialog open={showApplicationDetails} onOpenChange={setShowApplicationDetails}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Application Details</DialogTitle>
-            <DialogDescription>
-              Details of your application for {selectedApplication?.title} at {selectedApplication?.company}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedApplication && (
-            <div className="space-y-4 py-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-medium text-lg">{selectedApplication.title}</h3>
-                  <p className="text-sm text-muted-foreground">{selectedApplication.company}</p>
-                </div>
-                <Badge variant={selectedApplication.status === "Selected" ? "default" : "secondary"}>
-                  {selectedApplication.status}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium">Location</h4>
-                  <p className="text-sm">{selectedApplication.location}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium">Salary</h4>
-                  <p className="text-sm">{selectedApplication.salary}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium">Working Hours</h4>
-                  <p className="text-sm">{selectedApplication.workingHours}</p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium">Applied Date</h4>
-                  <p className="text-sm">{selectedApplication.appliedDate}</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium">Job Description</h4>
-                <p className="text-sm mt-1">{selectedApplication.jobDescription}</p>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium">Your Application Notes</h4>
-                <p className="text-sm mt-1">{selectedApplication.applicationNotes}</p>
-              </div>
-
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-medium">Contact Information</h4>
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Contact Person</p>
-                    <p className="text-sm">{selectedApplication.contactPerson}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="text-sm">{selectedApplication.contactEmail}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

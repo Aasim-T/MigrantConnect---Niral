@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import { api, fmtDate, inr, timeAgo, useApi } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,66 +21,46 @@ import { ArrowLeft, Building2, MapPin, Calendar, IndianRupee, Clock, CheckCircle
 
 export default function JobDetailsPage() {
   const params = useParams()
-  const router = useRouter()
-  const jobId = params.id
+  const jobId = params.id as string
 
   const [applicationNote, setApplicationNote] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
+  const { data, error, loading, reload } = useApi<{ job: any; application: any; similar: any[] }>(`/api/jobs/${jobId}`)
 
-  // Mock job data - in a real app, you would fetch this based on the jobId
-  const job = {
-    id: jobId,
-    title: "Construction Worker",
-    company: "ABC Builders",
-    location: "Delhi",
-    salary: "₹15,000 - ₹18,000/month",
-    type: "Full-time",
-    duration: "Long-term",
-    workingHours: "8 hours/day, 6 days/week",
-    skills: ["Construction", "Physical Labor", "Building"],
-    description:
-      "We are looking for experienced construction workers to join our team for a large residential project. The ideal candidate should have experience in construction work and be able to work in a team environment.",
-    responsibilities: [
-      "Prepare construction sites, materials, and tools",
-      "Load and unload materials, tools, and equipment",
-      "Remove debris, garbage, and dangerous materials from sites",
-      "Assist contractors, e.g., carpenters, electricians, and painters",
-      "Build and take apart temporary structures like scaffolding",
-      "Follow all health and safety regulations",
-    ],
-    requirements: [
-      "Previous experience in construction work (1+ years preferred)",
-      "Physical stamina and strength",
-      "Knowledge of construction techniques and materials",
-      "Ability to operate required equipment and tools",
-      "Valid identification documents",
-    ],
-    benefits: [
-      "Weekly payments",
-      "Accommodation provided",
-      "Meals provided during work hours",
-      "Safety equipment provided",
-      "Transportation to and from work site",
-    ],
-    postedDate: "2 days ago",
-    applicationDeadline: "30 days from now",
-  }
-
-  const handleApply = () => {
+  const handleApply = async () => {
     setIsSubmitting(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    setApplyError(null)
+    try {
+      await api("/api/applications", { body: { jobId, note: applicationNote } })
       setIsSuccess(true)
-
-      // Redirect after successful application
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 2000)
-    }, 1500)
+      reload()
+    } catch (e) {
+      setApplyError((e as Error).message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
+
+  if (loading && !data) return <div className="p-8 text-muted-foreground">Loading job...</div>
+  if (error || !data) {
+    return (
+      <div className="p-8 space-y-4">
+        <p className="text-red-600">{error || "Job not found"}</p>
+        <Link href="/jobs">
+          <Button variant="outline">Back to jobs</Button>
+        </Link>
+      </div>
+    )
+  }
+
+  const job = {
+    ...data.job,
+    salary: `${inr(data.job.salaryMin)} - ${inr(data.job.salaryMax)}/month`,
+    postedDate: timeAgo(data.job.postedAt),
+  }
+  const application = data.application
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -110,7 +91,7 @@ export default function JobDetailsPage() {
               <div className="space-y-2">
                 <h4 className="font-medium">Responsibilities:</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                  {job.responsibilities.map((item, index) => (
+                  {job.responsibilities.map((item: string, index: number) => (
                     <li key={index} className="text-sm">
                       {item}
                     </li>
@@ -121,7 +102,7 @@ export default function JobDetailsPage() {
               <div className="space-y-2">
                 <h4 className="font-medium">Requirements:</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                  {job.requirements.map((item, index) => (
+                  {job.requirements.map((item: string, index: number) => (
                     <li key={index} className="text-sm">
                       {item}
                     </li>
@@ -132,7 +113,7 @@ export default function JobDetailsPage() {
               <div className="space-y-2">
                 <h4 className="font-medium">Benefits:</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                  {job.benefits.map((item, index) => (
+                  {job.benefits.map((item: string, index: number) => (
                     <li key={index} className="text-sm">
                       {item}
                     </li>
@@ -142,7 +123,7 @@ export default function JobDetailsPage() {
 
               <div className="flex flex-wrap gap-2 pt-2">
                 <h4 className="font-medium mr-2">Skills:</h4>
-                {job.skills.map((skill) => (
+                {job.skills.map((skill: string) => (
                   <Badge key={skill} variant="secondary">
                     {skill}
                   </Badge>
@@ -184,48 +165,70 @@ export default function JobDetailsPage() {
                   <span className="font-medium">Posted:</span>
                   <span className="ml-2">{job.postedDate}</span>
                 </div>
+                <div className="flex items-center text-sm">
+                  <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">Apply by:</span>
+                  <span className="ml-2">{fmtDate(job.deadline)}</span>
+                </div>
+                {job.contactPerson && (
+                  <div className="text-sm text-muted-foreground">
+                    Contact: {job.contactPerson} ({job.contactEmail})
+                  </div>
+                )}
               </div>
             </CardContent>
-            <CardFooter>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button className="w-full">Apply for this Job</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Apply for {job.title}</DialogTitle>
-                    <DialogDescription>Your profile information will be shared with {job.company}</DialogDescription>
-                  </DialogHeader>
-
-                  {isSuccess ? (
-                    <div className="flex flex-col items-center justify-center py-4 space-y-2">
-                      <CheckCircle className="h-16 w-16 text-green-500" />
-                      <h3 className="text-xl font-medium">Application Submitted!</h3>
-                      <p className="text-center text-muted-foreground">
-                        Your application has been successfully submitted. You will be redirected to your dashboard.
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Add a note to your application (optional)</h4>
-                          <Textarea
-                            placeholder="Tell the employer why you're a good fit for this job..."
-                            value={applicationNote}
-                            onChange={(e) => setApplicationNote(e.target.value)}
-                          />
-                        </div>
+            <CardFooter className="flex flex-col gap-2">
+              {application ? (
+                <div className="w-full space-y-2 text-center">
+                  <Badge variant={application.status === "Selected" ? "default" : "secondary"}>Application: {application.status}</Badge>
+                  <p className="text-sm text-muted-foreground">Applied {timeAgo(application.appliedAt)}</p>
+                  <Link href="/applications">
+                    <Button variant="outline" className="w-full">
+                      View my applications
+                    </Button>
+                  </Link>
+                </div>
+              ) : job.status !== "Active" ? (
+                <p className="text-sm text-muted-foreground">This job is no longer accepting applications.</p>
+              ) : (
+                <Dialog onOpenChange={(open) => !open && setIsSuccess(false)}>
+                  <DialogTrigger asChild>
+                    <Button className="w-full">Apply for this Job</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Apply for {job.title}</DialogTitle>
+                      <DialogDescription>Your profile information will be shared with {job.company}</DialogDescription>
+                    </DialogHeader>
+                    {isSuccess ? (
+                      <div className="flex flex-col items-center justify-center py-4 space-y-2">
+                        <CheckCircle className="h-16 w-16 text-green-500" />
+                        <h3 className="text-xl font-medium">Application Submitted!</h3>
+                        <p className="text-center text-muted-foreground">The employer has been notified. Track it under My Applications.</p>
                       </div>
-                      <DialogFooter>
-                        <Button onClick={handleApply} disabled={isSubmitting}>
-                          {isSubmitting ? "Submitting..." : "Submit Application"}
-                        </Button>
-                      </DialogFooter>
-                    </>
-                  )}
-                </DialogContent>
-              </Dialog>
+                    ) : (
+                      <>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium">Add a note to your application (optional)</h4>
+                            <Textarea
+                              placeholder="Tell the employer why you're a good fit for this job..."
+                              value={applicationNote}
+                              onChange={(e) => setApplicationNote(e.target.value)}
+                            />
+                          </div>
+                          {applyError && <p className="text-sm text-red-600">{applyError}</p>}
+                        </div>
+                        <DialogFooter>
+                          <Button onClick={handleApply} disabled={isSubmitting}>
+                            {isSubmitting ? "Submitting..." : "Submit Application"}
+                          </Button>
+                        </DialogFooter>
+                      </>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              )}
             </CardFooter>
           </Card>
 
@@ -234,26 +237,21 @@ export default function JobDetailsPage() {
               <CardTitle>Similar Jobs</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2 border-b pb-2">
-                <div className="font-medium">Construction Helper</div>
-                <div className="text-sm">XYZ Construction</div>
-                <div className="text-sm text-muted-foreground">Delhi • ₹14,000 - ₹16,000/month</div>
-                <Link href="/jobs/2">
-                  <Button variant="link" className="px-0">
-                    View Job
-                  </Button>
-                </Link>
-              </div>
-              <div className="space-y-2">
-                <div className="font-medium">Building Worker</div>
-                <div className="text-sm">Metro Projects</div>
-                <div className="text-sm text-muted-foreground">Gurgaon • ₹16,000 - ₹19,000/month</div>
-                <Link href="/jobs/3">
-                  <Button variant="link" className="px-0">
-                    View Job
-                  </Button>
-                </Link>
-              </div>
+              {data.similar.length === 0 && <p className="text-sm text-muted-foreground">No similar jobs right now.</p>}
+              {data.similar.map((j) => (
+                <div key={j.id} className="space-y-1 border-b pb-2 last:border-0">
+                  <div className="font-medium">{j.title}</div>
+                  <div className="text-sm">{j.company}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {j.location} • {inr(j.salaryMin)} - {inr(j.salaryMax)}/month
+                  </div>
+                  <Link href={`/jobs/${j.id}`}>
+                    <Button variant="link" className="px-0">
+                      View Job
+                    </Button>
+                  </Link>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>

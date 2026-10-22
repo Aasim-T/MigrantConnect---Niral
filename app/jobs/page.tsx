@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { inr, timeAgo, useApi } from "@/lib/api"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,69 +13,12 @@ import { Label } from "@/components/ui/label"
 import { MapPin, Building2, Calendar, IndianRupee, Search, ArrowLeft } from "lucide-react"
 
 export default function JobsPage() {
-  // Mock data for jobs
-  const jobListings = [
-    {
-      id: 1,
-      title: "Construction Worker",
-      company: "ABC Builders",
-      location: "Delhi",
-      salary: "₹15,000 - ₹18,000/month",
-      type: "Full-time",
-      skills: ["Construction", "Physical Labor"],
-      postedDate: "2 days ago",
-    },
-    {
-      id: 2,
-      title: "Carpenter",
-      company: "XYZ Interiors",
-      location: "Gurgaon",
-      salary: "₹18,000 - ₹22,000/month",
-      type: "Full-time",
-      skills: ["Carpentry", "Woodworking"],
-      postedDate: "1 day ago",
-    },
-    {
-      id: 3,
-      title: "Painter",
-      company: "Modern Homes",
-      location: "Noida",
-      salary: "₹16,000 - ₹20,000/month",
-      type: "Contract",
-      skills: ["Painting", "Interior Design"],
-      postedDate: "3 days ago",
-    },
-    {
-      id: 4,
-      title: "Electrician",
-      company: "Power Solutions",
-      location: "Delhi",
-      salary: "₹20,000 - ₹25,000/month",
-      type: "Full-time",
-      skills: ["Electrical", "Wiring"],
-      postedDate: "5 days ago",
-    },
-    {
-      id: 5,
-      title: "Plumber",
-      company: "Water Works",
-      location: "Ghaziabad",
-      salary: "₹18,000 - ₹22,000/month",
-      type: "Part-time",
-      skills: ["Plumbing", "Pipe Fitting"],
-      postedDate: "1 week ago",
-    },
-    {
-      id: 6,
-      title: "Mason",
-      company: "Build Right",
-      location: "Faridabad",
-      salary: "₹16,000 - ₹20,000/month",
-      type: "Full-time",
-      skills: ["Masonry", "Bricklaying"],
-      postedDate: "4 days ago",
-    },
-  ]
+  const { data, loading, error } = useApi<{ jobs: any[] }>("/api/jobs")
+  const jobListings = (data?.jobs || []).map((job) => ({
+    ...job,
+    salary: `${inr(job.salaryMin)} - ${inr(job.salaryMax)}/month`,
+    postedDate: timeAgo(job.postedAt),
+  }))
 
   // State for search and filters
   const [searchTerm, setSearchTerm] = useState("")
@@ -98,12 +42,10 @@ export default function JobsPage() {
 
     const matchesJobType = selectedJobTypes.length === 0 || selectedJobTypes.includes(job.type)
 
-    const matchesSkills = selectedSkills.length === 0 || job.skills.some((skill) => selectedSkills.includes(skill))
+    const matchesSkills = selectedSkills.length === 0 || job.skills.some((skill: string) => selectedSkills.includes(skill))
 
     // Extract numeric salary range for comparison
-    const salaryText = job.salary.replace(/[^\d-]/g, "")
-    const [minSalary, maxSalary] = salaryText.split("-").map(Number)
-    const avgSalary = (minSalary + maxSalary) / 2
+    const avgSalary = (job.salaryMin + job.salaryMax) / 2
 
     const matchesSalary = avgSalary >= salaryRange[0] && avgSalary <= salaryRange[1]
 
@@ -222,7 +164,11 @@ export default function JobsPage() {
           </div>
 
           <div className="space-y-4">
-            {filteredJobs.length > 0 ? (
+            {loading ? (
+              <div className="text-center py-10 text-muted-foreground">Loading jobs...</div>
+            ) : error ? (
+              <div className="text-center py-10 text-red-600">{error}</div>
+            ) : filteredJobs.length > 0 ? (
               filteredJobs.map((job) => (
                 <Card key={job.id}>
                   <CardHeader className="pb-2">
@@ -250,7 +196,7 @@ export default function JobsPage() {
                         Posted {job.postedDate}
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
-                        {job.skills.map((skill) => (
+                        {job.skills.map((skill: string) => (
                           <Badge key={skill} variant="secondary">
                             {skill}
                           </Badge>
@@ -259,7 +205,13 @@ export default function JobsPage() {
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-between">
-                    <div className="text-sm text-muted-foreground">Apply before 30 days</div>
+                    <div className="text-sm text-muted-foreground">
+                      {job.applied ? (
+                        <Badge variant="outline">Applied</Badge>
+                      ) : (
+                        `Apply before ${new Date(job.deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                      )}
+                    </div>
                     <Link href={`/jobs/${job.id}`}>
                       <Button>View Details</Button>
                     </Link>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { api, inr, timeAgo, useApi } from "@/lib/api"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,85 +19,38 @@ export default function ApplicationsPage() {
   const [showApplicationDetails, setShowApplicationDetails] = useState(false)
   const [selectedApplication, setSelectedApplication] = useState<any>(null)
 
-  // Mock data for applications
-  const activeApplications = [
-    {
-      id: 101,
-      title: "Construction Helper",
-      company: "Metro Projects",
-      status: "Applied",
-      appliedDate: "5 days ago",
-      jobDescription:
-        "Assist in construction activities including material handling, site cleanup, and basic construction tasks.",
-      location: "Delhi",
-      salary: "₹14,000 - ₹16,000/month",
-      workingHours: "8 hours/day, 6 days/week",
-      contactPerson: "Nikitha Raj",
-      contactEmail: "nikitha.raj@metroprojects.com",
-      applicationNotes: "Highlighted previous experience in construction work.",
-    },
-    {
-      id: 102,
-      title: "Carpenter Assistant",
-      company: "Home Solutions",
-      status: "Selected",
-      appliedDate: "2 weeks ago",
-      jobDescription: "Assist the lead carpenter in furniture making, repairs, and installations.",
-      location: "Gurgaon",
-      salary: "₹16,000 - ₹18,000/month",
-      workingHours: "9 hours/day, 5 days/week",
-      contactPerson: "Rahul Verma",
-      contactEmail: "rahul.verma@homesolutions.com",
-      applicationNotes: "Mentioned carpentry skills and experience with various tools.",
-    },
-    {
-      id: 103,
-      title: "Painter",
-      company: "Modern Homes",
-      status: "Under Review",
-      appliedDate: "1 week ago",
-      jobDescription: "Painting of interior and exterior surfaces, preparation of surfaces, and cleanup.",
-      location: "Noida",
-      salary: "₹15,000 - ₹17,000/month",
-      workingHours: "8 hours/day, 6 days/week",
-      contactPerson: "Austin Prince",
-      contactEmail: "austin.prince@modernhomes.com",
-      applicationNotes: "Emphasized experience with different types of paints and surface preparation.",
-    },
-  ]
+  const { data, loading, reload } = useApi<{ applications: any[] }>("/api/applications")
+  const [withdrawing, setWithdrawing] = useState(false)
+  const all = (data?.applications || []).map((a) => ({
+    ...a,
+    title: a.job?.title || "Job removed",
+    company: a.job?.company || "",
+    appliedDate: timeAgo(a.appliedAt),
+    jobDescription: a.job?.description || "",
+    location: a.job?.location || "",
+    salary: a.job ? `${inr(a.job.salaryMin)} - ${inr(a.job.salaryMax)}/month` : "",
+    workingHours: a.job?.workingHours || "",
+    contactPerson: a.job?.contactPerson || "",
+    contactEmail: a.job?.contactEmail || "",
+    applicationNotes: a.note || "—",
+  }))
+  const isPast = (a: any) => a.status === "Rejected" || (a.job?.status === "Closed" && a.status !== "Selected")
+  const activeApplications = all.filter((a) => !isPast(a))
+  const pastApplications = all.filter(isPast)
 
-  const pastApplications = [
-    {
-      id: 201,
-      title: "Construction Worker",
-      company: "ABC Builders",
-      status: "Rejected",
-      appliedDate: "2 months ago",
-      jobDescription:
-        "General construction work including carrying materials, mixing cement, and assisting skilled workers.",
-      location: "Delhi",
-      salary: "₹15,000 - ₹18,000/month",
-      workingHours: "9 hours/day, 6 days/week",
-      contactPerson: "Leo Franklin",
-      contactEmail: "leo.franklin@abcbuilders.com",
-      applicationNotes: "Highlighted physical strength and previous construction experience.",
-    },
-    {
-      id: 202,
-      title: "Plumber Assistant",
-      company: "Water Works",
-      status: "Completed",
-      appliedDate: "3 months ago",
-      endDate: "1 month ago",
-      jobDescription: "Assist lead plumber in installation and repair of plumbing systems.",
-      location: "Ghaziabad",
-      salary: "₹14,000 - ₹16,000/month",
-      workingHours: "8 hours/day, 6 days/week",
-      contactPerson: "Adithiya Verma",
-      contactEmail: "adhithiya.verma@waterworks.com",
-      applicationNotes: "Mentioned basic knowledge of plumbing tools and systems.",
-    },
-  ]
+  const withdraw = async () => {
+    if (!selectedApplication) return
+    setWithdrawing(true)
+    try {
+      await api(`/api/applications/${selectedApplication.id}`, { method: "PATCH", body: { withdraw: true } })
+      setShowApplicationDetails(false)
+      reload()
+    } catch (e) {
+      alert((e as Error).message)
+    } finally {
+      setWithdrawing(false)
+    }
+  }
 
   // Filter applications based on search and status
   const filteredActiveApplications = activeApplications.filter((app) => {
@@ -153,10 +107,10 @@ export default function ApplicationsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="applied">Applied</SelectItem>
-            <SelectItem value="under review">Under Review</SelectItem>
+            <SelectItem value="new">New</SelectItem>
+            <SelectItem value="shortlisted">Shortlisted</SelectItem>
+            <SelectItem value="interviewed">Interviewed</SelectItem>
             <SelectItem value="selected">Selected</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -296,7 +250,7 @@ export default function ApplicationsPage() {
                       ? "default"
                       : selectedApplication.status === "Rejected"
                         ? "destructive"
-                        : selectedApplication.status === "Applied"
+                        : selectedApplication.status === "New"
                           ? "outline"
                           : "secondary"
                   }
@@ -358,6 +312,18 @@ export default function ApplicationsPage() {
                     <p className="text-sm">{selectedApplication.contactEmail}</p>
                   </div>
                 </div>
+              </div>
+              <div className="flex justify-between gap-2 border-t pt-4">
+                <Link href={`/jobs/${selectedApplication.jobId}`}>
+                  <Button variant="outline" size="sm">
+                    Open job posting
+                  </Button>
+                </Link>
+                {!["Selected", "Rejected"].includes(selectedApplication.status) && (
+                  <Button variant="destructive" size="sm" onClick={withdraw} disabled={withdrawing}>
+                    {withdrawing ? "Withdrawing..." : "Withdraw application"}
+                  </Button>
+                )}
               </div>
             </div>
           )}

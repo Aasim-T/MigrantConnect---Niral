@@ -3,6 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useSession } from "@/components/session-provider"
+import { api, fileToDataUrl } from "@/lib/api"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,34 +27,49 @@ import {
 } from "@/components/ui/dialog"
 
 export default function ProfilePage() {
-  // Mock data for worker profile
+  const { user, setUser } = useSession()
   const [profile, setProfile] = useState({
-    name: "Vishaal Maria Anto",
-    id: "MIG-12345",
-    aadhaar: "XXXX XXXX 1234",
-    dob: "1990-05-15",
-    phone: "9876543210",
-    address: "123, Main Street, Delhi",
-    skills: ["Construction", "Carpentry", "Painting"],
+    name: user.name,
+    id: user.id,
+    aadhaar: user.aadhaarMasked,
+    dob: user.dob,
+    phone: user.phone,
+    address: user.address || "",
+    location: user.location || "",
+    skills: user.skills as string[],
     customSkill: "",
-    employmentHistory: [
-      {
-        employer: "ABC Builders",
-        role: "Construction Worker",
-        duration: "Jan 2022 - Present",
-        location: "Delhi",
-      },
-      {
-        employer: "XYZ Construction",
-        role: "Helper",
-        duration: "Mar 2021 - Dec 2021",
-        location: "Gurgaon",
-      },
-    ],
-    education: "10th Standard",
-    languages: ["Hindi", "English (Basic)"],
+    employmentHistory: (user.employmentHistory || []) as { employer: string; role: string; duration: string; location?: string }[],
+    education: user.education || "",
+    languages: (user.languages || []) as string[],
     customLanguage: "",
+    annualIncome: user.annualIncome ? String(user.annualIncome) : "",
+    hasBankAccount: Boolean(user.hasBankAccount),
+    photo: (user.photo || "") as string,
   })
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const save = async (patch: Record<string, unknown>) => {
+    setIsSubmitting(true)
+    setSaveError(null)
+    try {
+      const r = await api("/api/profile", { method: "PUT", body: patch })
+      setUser(r.user)
+      setShowUpdateConfirmation(true)
+      setTimeout(() => setShowUpdateConfirmation(false), 1500)
+    } catch (e) {
+      setSaveError((e as Error).message)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const uploadPhoto = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > 1024 * 1024) return setSaveError("Photo must be under 1 MB")
+    const photo = await fileToDataUrl(file)
+    setProfile((p) => ({ ...p, photo }))
+    save({ photo })
+  }
 
   const [showLanguageDialog, setShowLanguageDialog] = useState(false)
   const [newLanguage, setNewLanguage] = useState("")
@@ -66,18 +83,19 @@ export default function ProfilePage() {
   // Update the handleProfileUpdate function to show the confirmation dialog
   const handleProfileUpdate = (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setShowUpdateConfirmation(true)
-
-      // Close the dialog after a delay
-      setTimeout(() => {
-        setShowUpdateConfirmation(false)
-      }, 2000)
-    }, 1000)
+    save({
+      name: profile.name,
+      dob: profile.dob,
+      phone: profile.phone,
+      address: profile.address,
+      location: profile.location,
+      education: profile.education,
+      languages: profile.languages,
+      skills: profile.skills,
+      employmentHistory: profile.employmentHistory,
+      annualIncome: profile.annualIncome,
+      hasBankAccount: profile.hasBankAccount,
+    })
   }
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -228,14 +246,16 @@ export default function ProfilePage() {
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center space-y-2">
               <Avatar className="h-24 w-24">
-                <AvatarImage src="/placeholder.svg?height=96&width=96" alt={profile.name} />
+                {profile.photo && <AvatarImage src={profile.photo} alt={profile.name} />}
                 <AvatarFallback>
                   <User className="h-12 w-12" />
                 </AvatarFallback>
               </Avatar>
-              <Button variant="outline" size="sm" className="gap-1 dark:border-gray-600 dark:text-gray-300">
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-muted dark:border-gray-600 dark:text-gray-300">
                 <Upload className="h-4 w-4" /> Upload Photo
-              </Button>
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => uploadPhoto(e.target.files?.[0])} />
+              </label>
+              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
             </div>
 
             <div className="space-y-1 text-center">
@@ -355,6 +375,30 @@ export default function ProfilePage() {
                       className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     />
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Current City / District</Label>
+                      <Input id="location" value={profile.location} onChange={(e) => setProfile({ ...profile, location: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="income">Annual Income (₹)</Label>
+                      <Input
+                        id="income"
+                        inputMode="numeric"
+                        value={profile.annualIncome}
+                        onChange={(e) => setProfile({ ...profile, annualIncome: e.target.value.replace(/\D/g, "") })}
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={profile.hasBankAccount}
+                      onChange={(e) => setProfile({ ...profile, hasBankAccount: e.target.checked })}
+                    />
+                    I have a savings bank account (needed for most welfare schemes)
+                  </label>
 
                   <div className="space-y-2">
                     <Label htmlFor="education" className="dark:text-gray-300">

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:reset": "node -e \"require('fs').rmSync('.data/db.json',{force:true});console.log('Seed data restored on next request')\""
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

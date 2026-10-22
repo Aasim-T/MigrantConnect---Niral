@@ -2,9 +2,11 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { api } from "@/lib/api"
+import { SKILLS } from "@/lib/validation"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,11 +23,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-export default function CreateJobPage() {
+function JobForm() {
   const router = useRouter()
+  const editId = useSearchParams().get("edit")
+  const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [newJobId, setNewJobId] = useState<number | null>(null)
+  const [newJobId, setNewJobId] = useState<string | null>(null)
 
   const [jobForm, setJobForm] = useState({
     title: "",
@@ -98,49 +102,46 @@ export default function CreateJobPage() {
     }
   }
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  // Editing an existing job: load it into the form
+  useEffect(() => {
+    if (!editId) return
+    api(`/api/jobs/${editId}`)
+      .then(({ job }) =>
+        setJobForm({
+          title: job.title,
+          description: job.description,
+          location: job.location,
+          salaryMin: String(job.salaryMin),
+          salaryMax: String(job.salaryMax),
+          type: job.type,
+          duration: job.duration,
+          workingHours: job.workingHours,
+          skills: job.skills,
+          responsibilities: job.responsibilities.length ? job.responsibilities : [""],
+          requirements: job.requirements.length ? job.requirements : [""],
+          benefits: job.benefits.length ? job.benefits : [""],
+        }),
+      )
+      .catch((e) => setError(e.message))
+  }, [editId])
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
+    if (!jobForm.type) return setError("Select a job type.")
+    if (jobForm.skills.length === 0) return setError("Select at least one required skill.")
     setIsSubmitting(true)
-
-    // Generate a random ID for the new job (in a real app, this would come from the backend)
-    const randomId = Math.floor(Math.random() * 1000) + 5
-    setNewJobId(randomId)
-
-    // In a real app, you would submit the form data to your API
-    console.log("Job posting:", jobForm)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    try {
+      const r = editId
+        ? await api(`/api/jobs/${editId}`, { method: "PATCH", body: jobForm })
+        : await api("/api/jobs", { body: jobForm })
+      setNewJobId(r.job.id)
       setShowSuccessDialog(true)
-
-      // Store the new job in localStorage to simulate adding it to the jobs list
-      const newJob = {
-        id: randomId,
-        title: jobForm.title,
-        location: jobForm.location,
-        type: jobForm.type,
-        salary: `₹${jobForm.salaryMin} - ₹${jobForm.salaryMax}/month`,
-        applicants: 0,
-        status: "Active",
-        postedDate: "Just now",
-      }
-
-      try {
-        // Try to get existing jobs from localStorage
-        const existingJobsString = localStorage.getItem("employerJobs")
-        const existingJobs = existingJobsString ? JSON.parse(existingJobsString) : []
-
-        // Add the new job
-        const updatedJobs = [newJob, ...existingJobs]
-
-        // Save back to localStorage
-        localStorage.setItem("employerJobs", JSON.stringify(updatedJobs))
-      } catch (error) {
-        console.error("Error saving job to localStorage:", error)
-      }
-    }, 1500)
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleCloseSuccess = () => {
@@ -159,8 +160,10 @@ export default function CreateJobPage() {
           <ArrowLeft className="h-4 w-4" />
           Back to jobs
         </Link>
-        <h2 className="text-3xl font-bold tracking-tight">Post a New Job</h2>
-        <p className="text-muted-foreground">Create a new job posting to find qualified workers</p>
+        <h2 className="text-3xl font-bold tracking-tight">{editId ? "Edit Job" : "Post a New Job"}</h2>
+        <p className="text-muted-foreground">
+          {editId ? "Update the job posting. Applicants keep their applications." : "Workers with matching skills are notified as soon as you post"}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -282,22 +285,7 @@ export default function CreateJobPage() {
               <div className="space-y-2">
                 <Label>Required Skills</Label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {[
-                    "Construction",
-                    "Plumbing",
-                    "Electrical",
-                    "Carpentry",
-                    "Painting",
-                    "Masonry",
-                    "Welding",
-                    "Driving",
-                    "Cooking",
-                    "Cleaning",
-                    "Agriculture",
-                    "Physical Labor",
-                    "Building",
-                    "Other",
-                  ].map((skill) => (
+                  {SKILLS.map((skill) => (
                     <Button
                       key={skill}
                       type="button"
@@ -419,12 +407,13 @@ export default function CreateJobPage() {
             </CardContent>
           </Card>
 
+          {error && <p className="text-right text-sm text-red-600">{error}</p>}
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" onClick={() => router.push("/employer/jobs")}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Posting..." : "Post Job"}
+              {isSubmitting ? "Saving..." : editId ? "Save Changes" : "Post Job"}
             </Button>
           </div>
         </div>
@@ -434,8 +423,10 @@ export default function CreateJobPage() {
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Job Posted Successfully</DialogTitle>
-            <DialogDescription>Your job has been posted and is now visible to potential applicants.</DialogDescription>
+            <DialogTitle>{editId ? "Job Updated" : "Job Posted Successfully"}</DialogTitle>
+            <DialogDescription>
+              {editId ? "Your changes are live." : `Job ${newJobId} is live and matching workers have been notified.`}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center py-4 space-y-2">
             <CheckCircle className="h-16 w-16 text-green-500" />
@@ -447,5 +438,13 @@ export default function CreateJobPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function CreateJobPage() {
+  return (
+    <Suspense>
+      <JobForm />
+    </Suspense>
   )
 }

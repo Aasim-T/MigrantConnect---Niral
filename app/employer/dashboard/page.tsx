@@ -2,101 +2,48 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Building2, MapPin, Users, AlertCircle, Plus } from "lucide-react"
-import { useState } from "react"
+import { Building2, MapPin, Users, AlertCircle, Plus, Briefcase, IndianRupee } from "lucide-react"
+import { useSession } from "@/components/session-provider"
+import { inr, timeAgo, useApi } from "@/lib/api"
 
 export default function EmployerDashboard() {
-  // Mock data for employer dashboard
-  const employer = {
-    name: "ABC Construction Company",
-    id: "EMP-5678",
-    location: "Delhi, India",
-    contactPerson: "Amit Sharma",
-    profileCompletion: 90,
-    industry: "Construction",
-  }
+  const { user: employer } = useSession()
+  const jobs = useApi<{ jobs: any[] }>("/api/jobs?mine=1")
+  const apps = useApi<{ applications: any[] }>("/api/applications")
+  const grievances = useApi<{ grievances: any[] }>("/api/grievances")
+  const wages = useApi<{ employments: any[]; records: any[] }>("/api/wages")
 
-  const postedJobs = [
+  const postedJobs = jobs.data?.jobs || []
+  const activeJobs = postedJobs.filter((j) => j.status === "Active")
+  const applications = apps.data?.applications || []
+  const newApplicants = applications.filter((a) => a.status === "New")
+  const openGrievances = (grievances.data?.grievances || []).filter((g) => g.status !== "Resolved")
+  const workforce = (wages.data?.employments || []).filter((e) => e.status === "Active")
+  const pendingWages = (wages.data?.records || []).filter((r) => r.status === "Pending")
+  const overdue = pendingWages.filter((r) => new Date(r.dueDate) < new Date())
+
+  const stats = [
+    { label: "Active jobs", value: activeJobs.length, icon: Briefcase, href: "/employer/jobs" },
+    { label: "New applicants", value: newApplicants.length, icon: Users, href: "/employer/applicants" },
+    { label: "Open grievances", value: openGrievances.length, icon: AlertCircle, href: "/employer/grievances" },
     {
-      id: 1,
-      title: "Construction Worker",
-      location: "Delhi",
-      applicants: 12,
-      status: "Active",
-      postedDate: "5 days ago",
-    },
-    {
-      id: 2,
-      title: "Site Supervisor",
-      location: "Gurgaon",
-      applicants: 8,
-      status: "Active",
-      postedDate: "1 week ago",
-    },
-    {
-      id: 3,
-      title: "Electrician",
-      location: "Noida",
-      applicants: 5,
-      status: "Closed",
-      postedDate: "3 weeks ago",
+      label: overdue.length ? `Wages overdue (${overdue.length})` : "Wages pending",
+      value: inr(pendingWages.reduce((s, r) => s + r.amount, 0)),
+      icon: IndianRupee,
+      href: "/employer/wages",
+      alert: overdue.length > 0,
     },
   ]
-
-  const recentApplicants = [
-    {
-      id: 101,
-      name: "Rajesh Kumar",
-      jobTitle: "Construction Worker",
-      skills: ["Construction", "Carpentry"],
-      appliedDate: "2 days ago",
-    },
-    {
-      id: 102,
-      name: "Sunil Verma",
-      jobTitle: "Construction Worker",
-      skills: ["Construction", "Painting"],
-      appliedDate: "3 days ago",
-    },
-    {
-      id: 103,
-      name: "Manoj Singh",
-      jobTitle: "Site Supervisor",
-      skills: ["Construction", "Management"],
-      appliedDate: "1 day ago",
-    },
-  ]
-
-  const [grievances, setGrievances] = useState([
-    {
-      id: 201,
-      title: "Working Hours Dispute",
-      worker: "Dinesh Patel",
-      status: "New",
-      filedDate: "2 days ago",
-    },
-  ])
-
-  const [selectedApplicant, setSelectedApplicant] = useState<any>(null)
-  const [showApplicantDetails, setShowApplicantDetails] = useState(false)
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Employer Dashboard</h2>
-          <p className="text-muted-foreground">Welcome back, {employer.name}</p>
+          <p className="text-muted-foreground">Welcome back, {employer.contactPerson}</p>
         </div>
         <Link href="/employer/jobs/create">
           <Button className="w-full md:w-auto">
@@ -105,100 +52,69 @@ export default function EmployerDashboard() {
         </Link>
       </div>
 
-      {/* Top row with company profile and active jobs */}
-      <div className="grid gap-4 grid-cols-12">
-        {/* Company Profile Card - wider */}
-        <Card className="col-span-9">
-          <CardHeader className="flex flex-row items-center gap-4 py-4">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src="/placeholder.svg?height=64&width=64" alt={employer.name} />
-              <AvatarFallback>
-                <Building2 className="h-8 w-8" />
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <CardTitle>{employer.name}</CardTitle>
-              <CardDescription>ID: {employer.id}</CardDescription>
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-4 py-4">
+          <Avatar className="h-16 w-16">
+            {employer.logo && <AvatarImage src={employer.logo} alt={employer.companyName} />}
+            <AvatarFallback>
+              <Building2 className="h-8 w-8" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <CardTitle>{employer.companyName}</CardTitle>
+            <CardDescription>
+              ID: {employer.id} · {employer.industry || "Industry not set"} · {workforce.length} worker(s) employed
+            </CardDescription>
+            {employer.location && (
               <div className="flex items-center mt-1 text-sm text-muted-foreground">
                 <MapPin className="mr-1 h-3 w-3" /> {employer.location}
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="text-sm font-medium">Contact Person</div>
-                <div className="text-sm">{employer.contactPerson}</div>
-              </div>
-              <div>
-                <div className="text-sm font-medium">Industry</div>
-                <div className="text-sm">{employer.industry}</div>
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="py-3">
-            <Link href="/employer/profile">
-              <Button variant="outline" size="sm">
-                View Company Profile
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
+            )}
+          </div>
+          <Link href="/employer/profile">
+            <Button variant="outline" size="sm">
+              Company Profile
+            </Button>
+          </Link>
+        </CardHeader>
+      </Card>
 
-        {/* Active Jobs Card */}
-        <Card className="col-span-3">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
-          </CardHeader>
-          <CardContent className="py-2">
-            <div className="text-2xl font-bold">{postedJobs.filter((job) => job.status === "Active").length}</div>
-            <p className="text-xs text-muted-foreground">{postedJobs.length} total jobs posted</p>
-          </CardContent>
-          <CardFooter className="pt-0 pb-3">
-            <Link href="/employer/jobs">
-              <Button variant="link" size="sm" className="px-0">
-                View All Jobs
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-4">
+        {stats.map((s) => (
+          <Link key={s.label} href={s.href}>
+            <Card className={`hover:bg-muted/50 ${s.alert ? "border-red-400" : ""}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className={`text-sm font-medium ${s.alert ? "text-red-600" : ""}`}>{s.label}</CardTitle>
+                <s.icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="text-2xl font-bold">{s.value}</CardContent>
+            </Card>
+          </Link>
+        ))}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="md:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>Posted Jobs</CardTitle>
-              <CardDescription>Manage your job postings</CardDescription>
-            </div>
-            <Link href="/employer/jobs/create">
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" /> New Job
-              </Button>
-            </Link>
+          <CardHeader>
+            <CardTitle>Your Job Postings</CardTitle>
+            <CardDescription>Most recent first</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {postedJobs.map((job) => (
-              <div key={job.id} className="flex flex-col space-y-2 rounded-lg border p-3">
-                <div className="flex justify-between">
+          <CardContent className="space-y-3">
+            {!jobs.loading && postedJobs.length === 0 && <p className="text-sm text-muted-foreground">No jobs posted yet.</p>}
+            {postedJobs.slice(0, 4).map((job) => (
+              <div key={job.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
                   <div className="font-medium">{job.title}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {job.location} · posted {timeAgo(job.postedAt)}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
                   <Badge variant={job.status === "Active" ? "default" : "secondary"}>{job.status}</Badge>
-                </div>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <MapPin className="mr-1 h-3 w-3" /> {job.location}
-                </div>
-                <div className="flex items-center text-sm">
-                  <Users className="mr-1 h-3 w-3" /> {job.applicants} applicants
-                </div>
-                <div className="text-xs text-muted-foreground">Posted {job.postedDate}</div>
-                <div className="flex justify-end gap-2">
                   <Link href={`/employer/jobs/${job.id}/applicants`}>
-                    <Button variant="outline" size="sm">
-                      View Applicants
+                    <Button size="sm" variant="outline">
+                      {job.applicants} applicant(s)
                     </Button>
-                  </Link>
-                  <Link href={`/employer/jobs/${job.id}`}>
-                    <Button size="sm">Manage</Button>
                   </Link>
                 </div>
               </div>
@@ -207,138 +123,72 @@ export default function EmployerDashboard() {
           <CardFooter>
             <Link href="/employer/jobs" className="w-full">
               <Button variant="outline" className="w-full">
-                View All Jobs
+                Manage Jobs
               </Button>
             </Link>
           </CardFooter>
         </Card>
 
-        {/* Grievances Card */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl font-bold">Grievances</CardTitle>
-            <CardDescription>Recent worker grievances</CardDescription>
+            <CardTitle>Recent Applicants</CardTitle>
+            <CardDescription>Waiting for your review</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {grievances.length > 0 ? (
-              grievances.map((grievance) => (
-                <div key={grievance.id} className="flex flex-col space-y-2 rounded-lg border p-3">
-                  <div className="flex justify-between">
-                    <div className="font-medium">{grievance.title}</div>
-                    <Badge variant={grievance.status === "Resolved" ? "default" : "outline"}>{grievance.status}</Badge>
-                  </div>
-                  <div className="text-sm">Filed by: {grievance.worker}</div>
-                  <div className="text-xs text-muted-foreground">Filed {grievance.filedDate}</div>
-                  <div className="flex justify-end">
-                    <Link href={`/employer/grievances/${grievance.id}`}>
-                      <Button size="sm">Respond</Button>
-                    </Link>
-                  </div>
+          <CardContent className="space-y-3">
+            {!apps.loading && newApplicants.length === 0 && <p className="text-sm text-muted-foreground">No new applicants.</p>}
+            {newApplicants.slice(0, 4).map((a) => (
+              <Link
+                key={a.id}
+                href={`/employer/jobs/${a.jobId}/applicants?applicant=${a.id}`}
+                className="block rounded-lg border p-3 hover:bg-muted/50"
+              >
+                <div className="font-medium">{a.worker?.name}</div>
+                <div className="text-sm text-muted-foreground">
+                  {a.job?.title} · {timeAgo(a.appliedAt)}
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-4 text-sm text-muted-foreground">No active grievances</div>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Link href="/employer/grievances" className="w-full">
-              <Button variant="outline" className="w-full">
-                View All Grievances
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-1">
-        {/* Recent Applicants Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle className="text-xl font-bold">Recent Applicants</CardTitle>
-              <CardDescription>Latest job applications</CardDescription>
-            </div>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentApplicants.map((applicant) => (
-              <div key={applicant.id} className="flex flex-col space-y-2 rounded-lg border p-3">
-                <div className="flex justify-between">
-                  <div className="font-medium">{applicant.name}</div>
-                </div>
-                <div className="text-sm">{applicant.jobTitle}</div>
-                <div className="flex flex-wrap gap-1">
-                  {applicant.skills.map((skill) => (
-                    <Badge key={skill} variant="secondary" className="text-xs">
-                      {skill}
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {(a.worker?.skills || []).slice(0, 3).map((s: string) => (
+                    <Badge key={s} variant="secondary" className="text-xs">
+                      {s}
                     </Badge>
                   ))}
                 </div>
-                <div className="text-xs text-muted-foreground">Applied {applicant.appliedDate}</div>
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setSelectedApplicant(applicant)
-                      setShowApplicantDetails(true)
-                    }}
-                  >
-                    View Profile
-                  </Button>
-                </div>
-              </div>
+              </Link>
             ))}
           </CardContent>
           <CardFooter>
             <Link href="/employer/applicants" className="w-full">
               <Button variant="outline" className="w-full">
-                View All Applicants
+                All Applicants
               </Button>
             </Link>
           </CardFooter>
         </Card>
       </div>
 
-      {/* Applicant Details Dialog */}
-      <Dialog open={showApplicantDetails} onOpenChange={setShowApplicantDetails}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Applicant Profile</DialogTitle>
-            <DialogDescription>Details for {selectedApplicant?.name}</DialogDescription>
-          </DialogHeader>
-          {selectedApplicant && (
-            <div className="space-y-4 py-4">
-              <div className="flex items-start gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback>
-                    {selectedApplicant.name
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-medium text-lg">{selectedApplicant.name}</h3>
-                  <p className="text-sm">{selectedApplicant.jobTitle}</p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {selectedApplicant.skills.map((skill: string) => (
-                      <Badge key={skill} variant="secondary" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">Applied {selectedApplicant.appliedDate}</p>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Open Grievances</CardTitle>
+            <CardDescription>Respond quickly: unresolved grievances can be escalated to the labour department</CardDescription>
+          </div>
+          <AlertCircle className="h-5 w-5 text-orange-500" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!grievances.loading && openGrievances.length === 0 && <p className="text-sm text-muted-foreground">No open grievances.</p>}
+          {openGrievances.slice(0, 4).map((g) => (
+            <Link key={g.id} href={`/employer/grievances/${g.id}`} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50">
+              <div>
+                <div className="font-medium">{g.title}</div>
+                <div className="text-sm text-muted-foreground">
+                  {g.workerName} · {g.type} · filed {timeAgo(g.filedAt)}
                 </div>
               </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowApplicantDetails(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <Badge variant={g.status === "New" ? "destructive" : "outline"}>{g.status}</Badge>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   )
 }

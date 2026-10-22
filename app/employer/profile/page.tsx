@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useSession } from "@/components/session-provider"
+import { api, fileToDataUrl } from "@/lib/api"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,31 +23,51 @@ import {
 import { motion } from "framer-motion"
 
 export default function EmployerProfilePage() {
-  // Mock data for employer profile
+  const { user, setUser } = useSession()
   const [profile, setProfile] = useState({
-    companyName: "ABC Construction Company",
-    id: "EMP-5678",
-    contactPerson: "Amit Sharma",
-    email: "amit.sharma@abcconstruction.com",
-    phone: "9876543210",
-    address: "456, Business District, Delhi",
-    website: "www.abcconstruction.com",
-    description:
-      "ABC Construction Company is a leading construction firm specializing in residential and commercial projects across Delhi NCR. We have been in business for over 15 years and have completed more than 100 projects.",
-    industry: "Construction",
-    employeeCount: "50-100",
-    yearEstablished: "2008",
+    companyName: user.companyName,
+    id: user.id,
+    contactPerson: user.contactPerson,
+    email: user.email,
+    phone: user.phone,
+    address: user.address || "",
+    location: user.location || "",
+    website: user.website || "",
+    description: user.description || "",
+    industry: user.industry || "",
+    employeeCount: user.employeeCount || "",
+    yearEstablished: user.yearEstablished || "",
+    logo: (user.logo || "") as string,
   })
-
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Handle profile update
+  const save = async (body: Record<string, unknown>) => {
+    setSaving(true)
+    setError(null)
+    try {
+      const r = await api("/api/profile", { method: "PUT", body })
+      setUser(r.user)
+      setShowUpdateDialog(true)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleProfileUpdate = () => {
-    // In a real app, you would submit the updated profile to your API
-    console.log("Updated profile:", profile)
+    const { id: _id, logo: _logo, ...fields } = profile
+    save(fields)
+  }
 
-    // Show dialog instead of just a notification
-    setShowUpdateDialog(true)
+  const uploadLogo = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > 1024 * 1024) return setError("Logo must be under 1 MB")
+    const logo = await fileToDataUrl(file)
+    setProfile((p) => ({ ...p, logo }))
+    save({ logo })
   }
 
   const fadeIn = {
@@ -84,14 +106,15 @@ export default function EmployerProfilePage() {
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center space-y-2">
               <Avatar className="h-24 w-24">
-                <AvatarImage src="/placeholder.svg?height=96&width=96" alt={profile.companyName} />
+                {profile.logo && <AvatarImage src={profile.logo} alt={profile.companyName} />}
                 <AvatarFallback>
                   <Building2 className="h-12 w-12" />
                 </AvatarFallback>
               </Avatar>
-              <Button variant="outline" size="sm" className="gap-1 dark:border-gray-600 dark:text-gray-300">
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-muted dark:border-gray-600 dark:text-gray-300">
                 <Upload className="h-4 w-4" /> Upload Logo
-              </Button>
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => uploadLogo(e.target.files?.[0])} />
+              </label>
             </div>
 
             <div className="space-y-1 text-center">
@@ -271,8 +294,11 @@ export default function EmployerProfilePage() {
               </div>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button onClick={handleProfileUpdate}>Update Company Profile</Button>
+          <CardFooter className="flex flex-col items-start gap-2">
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <Button onClick={handleProfileUpdate} disabled={saving}>
+              {saving ? "Saving..." : "Update Company Profile"}
+            </Button>
           </CardFooter>
         </Card>
       </div>

@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { api, inr, timeAgo, useApi } from "@/lib/api"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,49 +21,14 @@ import {
 } from "@/components/ui/dialog"
 
 export default function EmployerJobsPage() {
-  // Mock data for jobs
-  const [jobs, setJobs] = useState([
-    {
-      id: 1,
-      title: "Construction Worker",
-      location: "Delhi",
-      type: "Full-time",
-      salary: "₹15,000 - ₹18,000/month",
-      applicants: 12,
-      status: "Active",
-      postedDate: "5 days ago",
-    },
-    {
-      id: 2,
-      title: "Site Supervisor",
-      location: "Gurgaon",
-      type: "Full-time",
-      salary: "₹25,000 - ₹30,000/month",
-      applicants: 8,
-      status: "Active",
-      postedDate: "1 week ago",
-    },
-    {
-      id: 3,
-      title: "Electrician",
-      location: "Noida",
-      type: "Contract",
-      salary: "₹20,000 - ₹22,000/month",
-      applicants: 5,
-      status: "Closed",
-      postedDate: "3 weeks ago",
-    },
-    {
-      id: 4,
-      title: "Painter",
-      location: "Delhi",
-      type: "Part-time",
-      salary: "₹12,000 - ₹15,000/month",
-      applicants: 7,
-      status: "Active",
-      postedDate: "2 days ago",
-    },
-  ])
+  const router = useRouter()
+  const { data, loading, reload, setData } = useApi<{ jobs: any[] }>("/api/jobs?mine=1")
+  const jobs = (data?.jobs || []).map((job) => ({
+    ...job,
+    salary: `${inr(job.salaryMin)} - ${inr(job.salaryMax)}/month`,
+    postedDate: timeAgo(job.postedAt),
+  }))
+  const [operationError, setOperationError] = useState<string | null>(null)
 
   // State for search and filters
   const [searchTerm, setSearchTerm] = useState("")
@@ -72,62 +39,30 @@ export default function EmployerJobsPage() {
   const [operationSuccess, setOperationSuccess] = useState(false)
   const [operationMessage, setOperationMessage] = useState("")
 
-  const handleJobOperation = (operation: string) => {
-    // Start with closing the options dialog
-    setShowJobOptions(false)
-
-    // Simulate the operation
-    let message = ""
-
-    switch (operation) {
-      case "modify":
-        message = "Job details have been updated successfully"
-        // Here we would navigate to edit page or show edit dialog in a real app
-        break
-      case "close":
-        message =
-          selectedJob?.status === "Active" ? "Job has been closed successfully" : "Job has been activated successfully"
-        // In a real app, we would update the job status in the database
-        setJobs((prevJobs) =>
-          prevJobs.map((job) =>
-            job.id === selectedJob?.id ? { ...job, status: job.status === "Active" ? "Closed" : "Active" } : job,
-          ),
-        )
-        break
-      case "delete":
-        message = "Job has been deleted successfully"
-        // In a real app, we would delete the job from the database
-        setJobs((prevJobs) => prevJobs.filter((job) => job.id !== selectedJob?.id))
-        break
-      default:
-        return
+  const handleJobOperation = async (operation: string) => {
+    if (!selectedJob) return
+    setOperationError(null)
+    if (operation === "modify") {
+      router.push(`/employer/jobs/create?edit=${selectedJob.id}`)
+      return
     }
-
-    // Show success message
-    setOperationMessage(message)
-    setOperationSuccess(true)
-  }
-
-  // Check localStorage for new jobs on component mount
-  useEffect(() => {
     try {
-      const storedJobsString = localStorage.getItem("employerJobs")
-      if (storedJobsString) {
-        const storedJobs = JSON.parse(storedJobsString)
-        if (Array.isArray(storedJobs) && storedJobs.length > 0) {
-          // Merge stored jobs with existing jobs, avoiding duplicates
-          const existingIds = jobs.map((job) => job.id)
-          const newJobs = storedJobs.filter((job) => !existingIds.includes(job.id))
-
-          if (newJobs.length > 0) {
-            setJobs([...newJobs, ...jobs])
-          }
-        }
+      if (operation === "close") {
+        const status = selectedJob.status === "Active" ? "Closed" : "Active"
+        await api(`/api/jobs/${selectedJob.id}`, { method: "PATCH", body: { status } })
+        setOperationMessage(status === "Closed" ? "Job has been closed" : "Job has been activated")
+      } else if (operation === "delete") {
+        await api(`/api/jobs/${selectedJob.id}`, { method: "DELETE" })
+        setData((d) => (d ? { jobs: d.jobs.filter((j) => j.id !== selectedJob.id) } : d))
+        setOperationMessage("Job has been deleted")
       }
-    } catch (error) {
-      console.error("Error loading jobs from localStorage:", error)
+      setShowJobOptions(false)
+      setOperationSuccess(true)
+      reload()
+    } catch (e) {
+      setOperationError((e as Error).message)
     }
-  }, [])
+  }
 
   // Filter jobs based on search and filters
   const filteredJobs = jobs.filter((job) => {
@@ -261,7 +196,8 @@ export default function EmployerJobsPage() {
         ))}
       </motion.div>
 
-      {filteredJobs.length === 0 && (
+      {loading && <p className="text-muted-foreground">Loading jobs...</p>}
+      {!loading && filteredJobs.length === 0 && (
         <div className="text-center py-12">
           <h3 className="text-lg font-medium dark:text-white">No jobs found</h3>
           <p className="text-muted-foreground dark:text-gray-400 mt-1">
@@ -296,6 +232,7 @@ export default function EmployerJobsPage() {
             <Button onClick={() => handleJobOperation("delete")} variant="outline" className="w-full">
               Delete Job
             </Button>
+            {operationError && <p className="text-sm text-red-600">{operationError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowJobOptions(false)}>

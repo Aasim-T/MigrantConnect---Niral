@@ -10,196 +10,82 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowLeft, CheckCircle } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { api, fmtDate, inr, useApi } from "@/lib/api"
+
+const ISSUE_TITLES: Record<string, string> = {
+  delayed: "Delayed Payment",
+  incorrect: "Incorrect Wage Amount",
+  other: "Wage Issue",
+}
 
 export default function WagesPage() {
-  const [showReportDialog, setShowReportDialog] = useState(false)
+  const { data, loading, reload } = useApi<{ employments: any[]; records: any[]; disputes: any[] }>("/api/wages")
   const [currentJob, setCurrentJob] = useState<any>(null)
-  const [issueType, setIssueType] = useState<string>("delayed")
-  const [otherIssueText, setOtherIssueText] = useState<string>("")
-  const [reportSubmitted, setReportSubmitted] = useState(false)
-  const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedWage, setSelectedWage] = useState<any>(null)
-  const [reportReason, setReportReason] = useState("")
-  const [reportType, setReportType] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [showOtherIssueField, setShowOtherIssueField] = useState(false)
-  const [otherIssueDescription, setOtherIssueDescription] = useState("")
+  const [issueType, setIssueType] = useState("delayed")
+  const [details, setDetails] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<any>(null)
 
-  // Mock data for wages
-  const currentWages = [
-    {
-      id: 1,
-      jobTitle: "Construction Worker",
-      employer: "ABC Builders",
-      startDate: "01/05/2023",
-      endDate: "Ongoing",
-      salary: "₹15,000/month",
-      paymentStatus: "Pending",
-      dueDate: "30/05/2023",
-    },
-    {
-      id: 2,
-      jobTitle: "Carpenter Assistant",
-      employer: "Home Solutions",
-      startDate: "15/04/2023",
-      endDate: "Ongoing",
-      salary: "₹16,000/month",
-      paymentStatus: "Paid",
-      paidDate: "15/05/2023",
-    },
-  ]
+  const employments = data?.employments || []
+  const records = data?.records || []
+  const disputes = data?.disputes || []
+  const currentJobs = employments.filter((e) => e.status === "Active")
+  const pastJobs = employments.filter((e) => e.status === "Ended")
+  const paid = records.filter((r) => r.status === "Paid")
+  const pending = records.filter((r) => r.status === "Pending")
+  const year = new Date().getFullYear()
+  const yearTotal = paid.filter((r) => new Date(r.paidAt).getFullYear() === year).reduce((s, r) => s + r.amount, 0)
+  const nextDue = pending.map((r) => r.dueDate).sort()[0]
+  const thisMonth = records
+    .filter((r) => new Date(r.createdAt).getMonth() === new Date().getMonth() && new Date(r.createdAt).getFullYear() === year)
+    .reduce((s, r) => s + r.amount, 0)
 
-  // Mock data for current jobs
-  const currentJobs = [
-    {
-      id: 1,
-      title: "Construction Helper",
-      employer: "Metro Projects",
-      location: "Delhi",
-      startDate: "15 Mar 2023",
-      dailyWage: "₹600",
-      daysWorked: 22,
-      totalEarned: "₹13,200",
-      paymentStatus: "Paid",
-      paymentDate: "05 Apr 2023",
-    },
-    {
-      id: 2,
-      title: "Carpenter Assistant",
-      employer: "Home Solutions",
-      location: "Gurgaon",
-      startDate: "01 Apr 2023",
-      dailyWage: "₹700",
-      daysWorked: 18,
-      totalEarned: "₹12,600",
-      paymentStatus: "Pending",
-      paymentDate: "Expected by 05 May 2023",
-    },
-  ]
-
-  // Mock data for past jobs
-  const pastJobs = [
-    {
-      id: 101,
-      title: "Painter",
-      employer: "Modern Homes",
-      location: "Noida",
-      period: "01 Jan 2023 - 28 Feb 2023",
-      totalEarned: "₹32,000",
-      paymentStatus: "Paid",
-      paymentDate: "05 Mar 2023",
-    },
-    {
-      id: 102,
-      title: "Plumber Assistant",
-      employer: "City Services",
-      location: "Delhi",
-      period: "15 Nov 2022 - 15 Dec 2022",
-      totalEarned: "₹18,000",
-      paymentStatus: "Paid",
-      paymentDate: "20 Dec 2022",
-    },
-  ]
-
-  const paymentHistory = [
-    {
-      id: 101,
-      jobTitle: "Construction Helper",
-      employer: "Metro Projects",
-      period: "March 2023",
-      amount: "₹14,500",
-      paymentDate: "05/04/2023",
-      paymentMethod: "Bank Transfer",
-    },
-    {
-      id: 102,
-      jobTitle: "Construction Helper",
-      employer: "Metro Projects",
-      period: "February 2023",
-      amount: "₹14,500",
-      paymentDate: "05/03/2023",
-      paymentMethod: "Bank Transfer",
-    },
-    {
-      id: 103,
-      jobTitle: "Painter",
-      employer: "Modern Homes",
-      period: "January 2023",
-      amount: "₹16,000",
-      paymentDate: "02/02/2023",
-      paymentMethod: "Cash",
-    },
-  ]
-
-  const disputes = [
-    {
-      id: 201,
-      jobTitle: "Construction Worker",
-      employer: "XYZ Construction",
-      period: "December 2022",
-      amount: "₹15,000",
-      status: "In Progress",
-      filedDate: "15/01/2023",
-      description: "Payment delayed by more than 30 days",
-    },
-  ]
-
-  const handleReportIssue = (job: any) => {
+  const openReport = (job: any) => {
     setCurrentJob(job)
-    setShowReportDialog(true)
-    setReportSubmitted(false)
     setIssueType("delayed")
-    setOtherIssueText("")
+    setDetails("")
+    setError(null)
+    setCreated(null)
   }
 
-  const handleSubmitReport = (e: React.FormEvent) => {
+  const submitReport = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, this would submit the report to a backend
-    setReportSubmitted(true)
-  }
-
-  const handleReportTypeChange = (value: string) => {
-    setReportType(value)
-    setShowOtherIssueField(value === "other")
-  }
-
-  const submitReport = () => {
-    if (!reportType) return
-    if (reportType === "other" && !otherIssueDescription.trim()) return
-
-    setIsSubmitting(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setIsSuccess(true)
-
-      // Reset after showing success message
-      setTimeout(() => {
-        setReportDialogOpen(false)
-      }, 2000)
-    }, 1500)
+    if (!details.trim()) return setError("Describe the issue so the employer can act on it.")
+    setSubmitting(true)
+    setError(null)
+    // Link the dispute to the oldest unpaid entry for this job, if any
+    const wage = pending.filter((r) => r.employmentId === currentJob.id).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0]
+    try {
+      const r = await api("/api/grievances", {
+        body: {
+          type: "Wage Dispute",
+          title: ISSUE_TITLES[issueType],
+          description: details,
+          employerId: currentJob.employerId,
+          jobTitle: currentJob.title,
+          workPeriod: wage?.period,
+          amountDue: wage?.amount,
+          wageRecordId: wage?.id,
+        },
+      })
+      setCreated(r.grievance)
+      reload()
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
       <div>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
-        >
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2">
           <ArrowLeft className="h-4 w-4" />
           Back to dashboard
         </Link>
@@ -210,11 +96,11 @@ export default function WagesPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Current Month Earnings</CardTitle>
+            <CardTitle className="text-sm font-medium">Recorded This Month</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹31,000</div>
-            <p className="text-xs text-muted-foreground">From 2 active jobs</p>
+            <div className="text-2xl font-bold">{inr(thisMonth)}</div>
+            <p className="text-xs text-muted-foreground">From {currentJobs.length} active job(s)</p>
           </CardContent>
         </Card>
         <Card>
@@ -222,115 +108,173 @@ export default function WagesPage() {
             <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹15,000</div>
-            <p className="text-xs text-muted-foreground">Due on 30/05/2023</p>
+            <div className={`text-2xl font-bold ${pending.length ? "text-orange-600" : ""}`}>
+              {inr(pending.reduce((s, r) => s + r.amount, 0))}
+            </div>
+            <p className="text-xs text-muted-foreground">{nextDue ? `Next due ${fmtDate(nextDue)}` : "Nothing pending"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Earnings (2023)</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Received ({year})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹76,000</div>
-            <p className="text-xs text-muted-foreground">From 5 jobs</p>
+            <div className="text-2xl font-bold">{inr(yearTotal)}</div>
+            <p className="text-xs text-muted-foreground">From {employments.length} job(s)</p>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="current" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="current">Current Jobs & Wages</TabsTrigger>
           <TabsTrigger value="history">Payment History</TabsTrigger>
-          <TabsTrigger value="disputes">Disputes</TabsTrigger>
-          <TabsTrigger value="past">Past Jobs & Wages</TabsTrigger>
+          <TabsTrigger value="disputes">Disputes ({disputes.filter((d) => d.status !== "Resolved").length})</TabsTrigger>
+          <TabsTrigger value="past">Past Jobs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="current" className="space-y-4">
-          <div className="grid gap-4">
-            {currentJobs.map((job) => (
-              <Card key={job.id}>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle>{job.title}</CardTitle>
-                      <CardDescription>{job.employer}</CardDescription>
-                    </div>
-                    <Badge variant={job.paymentStatus === "Paid" ? "default" : "secondary"}>{job.paymentStatus}</Badge>
+          {loading && <p className="text-muted-foreground">Loading...</p>}
+          {!loading && currentJobs.length === 0 && (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No active jobs. When an employer selects you for a job, it appears here with your wages.
+              </CardContent>
+            </Card>
+          )}
+          {currentJobs.map((job) => (
+            <Card key={job.id}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>{job.title}</CardTitle>
+                    <CardDescription>{job.employerName}</CardDescription>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <div className="text-sm font-medium">Location</div>
-                      <div className="text-sm">{job.location}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Start Date</div>
-                      <div className="text-sm">{job.startDate}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Daily Wage</div>
-                      <div className="text-sm">{job.dailyWage}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Days Worked</div>
-                      <div className="text-sm">{job.daysWorked} days</div>
-                    </div>
+                  <Badge variant={job.pendingAmount ? "secondary" : "default"}>{job.pendingAmount ? "Payment pending" : "Up to date"}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <div className="text-sm font-medium">Location</div>
+                    <div className="text-sm">{job.location}</div>
                   </div>
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-sm font-medium">Total Earned</div>
-                        <div className="text-lg font-bold">{job.totalEarned}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium">Payment Date</div>
-                        <div className="text-sm">{job.paymentDate}</div>
-                      </div>
-                    </div>
+                  <div>
+                    <div className="text-sm font-medium">Start Date</div>
+                    <div className="text-sm">{fmtDate(job.startDate)}</div>
                   </div>
-                </CardContent>
-                <CardFooter>
-                  <Button variant="outline" onClick={() => handleReportIssue(job)}>
-                    Report Issue
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+                  <div>
+                    <div className="text-sm font-medium">Daily Wage</div>
+                    <div className="text-sm">{inr(job.dailyWage)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">Days Recorded</div>
+                    <div className="text-sm">{job.daysWorked} days</div>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <div className="text-sm font-medium">Total Earned</div>
+                    <div className="text-lg font-bold">{inr(job.totalEarned)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">Paid</div>
+                    <div className="text-lg">{inr(job.totalPaid)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">Pending</div>
+                    <div className={`text-lg ${job.pendingAmount ? "text-orange-600 font-semibold" : ""}`}>{inr(job.pendingAmount)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">{job.nextDue ? "Next Due" : "Last Paid"}</div>
+                    <div className="text-sm">{fmtDate(job.nextDue || job.lastPaidAt)}</div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" onClick={() => openReport(job)}>
+                  Report Issue
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+          {pending.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Unpaid Entries</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Days</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Due</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pending.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-medium">
+                          {r.jobTitle}
+                          <div className="text-xs text-muted-foreground">{r.employerName}</div>
+                        </TableCell>
+                        <TableCell>{r.period}</TableCell>
+                        <TableCell>{r.daysWorked}</TableCell>
+                        <TableCell>{inr(r.amount)}</TableCell>
+                        <TableCell className={new Date(r.dueDate) < new Date() ? "text-red-600 font-medium" : ""}>
+                          {fmtDate(r.dueDate)}
+                          {new Date(r.dueDate) < new Date() && " (overdue)"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Payment History</CardTitle>
-              <CardDescription>Record of all your past payments</CardDescription>
+              <CardDescription>Record of all payments received</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Job Title</TableHead>
-                    <TableHead>Employer</TableHead>
-                    <TableHead>Period</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Payment Date</TableHead>
-                    <TableHead>Method</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paymentHistory.map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell className="font-medium">{payment.jobTitle}</TableCell>
-                      <TableCell>{payment.employer}</TableCell>
-                      <TableCell>{payment.period}</TableCell>
-                      <TableCell>{payment.amount}</TableCell>
-                      <TableCell>{payment.paymentDate}</TableCell>
-                      <TableCell>{payment.paymentMethod}</TableCell>
+              {paid.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job Title</TableHead>
+                      <TableHead>Employer</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Payment Date</TableHead>
+                      <TableHead>Method</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paid.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="font-medium">{p.jobTitle}</TableCell>
+                        <TableCell>{p.employerName}</TableCell>
+                        <TableCell>{p.period}</TableCell>
+                        <TableCell>{inr(p.amount)}</TableCell>
+                        <TableCell>{fmtDate(p.paidAt)}</TableCell>
+                        <TableCell>
+                          {p.method}
+                          {p.transactionId && <div className="text-xs text-muted-foreground">Ref {p.transactionId}</div>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -342,7 +286,7 @@ export default function WagesPage() {
                 <CardTitle>Payment Disputes</CardTitle>
                 <CardDescription>Track the status of your payment disputes</CardDescription>
               </div>
-              <Link href="/grievances/create">
+              <Link href="/grievances/create?type=Wage%20Dispute">
                 <Button size="sm">Report New Issue</Button>
               </Link>
             </CardHeader>
@@ -351,28 +295,28 @@ export default function WagesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Job Title</TableHead>
+                      <TableHead>Issue</TableHead>
                       <TableHead>Employer</TableHead>
                       <TableHead>Period</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Filed Date</TableHead>
+                      <TableHead>Filed</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {disputes.map((dispute) => (
-                      <TableRow key={dispute.id}>
-                        <TableCell className="font-medium">{dispute.jobTitle}</TableCell>
-                        <TableCell>{dispute.employer}</TableCell>
-                        <TableCell>{dispute.period}</TableCell>
-                        <TableCell>{dispute.amount}</TableCell>
+                    {disputes.map((d) => (
+                      <TableRow key={d.id}>
+                        <TableCell className="font-medium">{d.title}</TableCell>
+                        <TableCell>{d.employerName}</TableCell>
+                        <TableCell>{d.workPeriod || "—"}</TableCell>
+                        <TableCell>{d.amountDue ? inr(d.amountDue) : "—"}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{dispute.status}</Badge>
+                          <Badge variant={d.status === "Resolved" ? "default" : "outline"}>{d.status}</Badge>
                         </TableCell>
-                        <TableCell>{dispute.filedDate}</TableCell>
+                        <TableCell>{fmtDate(d.filedAt)}</TableCell>
                         <TableCell>
-                          <Link href={`/grievances/${dispute.id}`}>
+                          <Link href={`/grievances/${d.id}`}>
                             <Button variant="outline" size="sm" className="h-8">
                               View Details
                             </Button>
@@ -385,14 +329,10 @@ export default function WagesPage() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center">
                   <CheckCircle className="h-12 w-12 text-green-500 mb-2" />
-                  <h3 className="text-lg font-medium">No Active Disputes</h3>
+                  <h3 className="text-lg font-medium">No Disputes</h3>
                   <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                    You don't have any active payment disputes. If you're experiencing issues with your payments, you
-                    can report them.
+                    If you are having problems with your payments, report them from the job card or the grievance form.
                   </p>
-                  <Link href="/grievances/create" className="mt-4">
-                    <Button>Report Payment Issue</Button>
-                  </Link>
                 </div>
               )}
             </CardContent>
@@ -400,60 +340,62 @@ export default function WagesPage() {
         </TabsContent>
 
         <TabsContent value="past" className="space-y-4">
-          <div className="grid gap-4">
-            {pastJobs.map((job) => (
-              <Card key={job.id}>
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle>{job.title}</CardTitle>
-                      <CardDescription>{job.employer}</CardDescription>
-                    </div>
-                    <Badge variant="default">{job.paymentStatus}</Badge>
+          {pastJobs.length === 0 && <p className="text-muted-foreground">No past jobs yet.</p>}
+          {pastJobs.map((job) => (
+            <Card key={job.id}>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle>{job.title}</CardTitle>
+                    <CardDescription>{job.employerName}</CardDescription>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <div className="text-sm font-medium">Location</div>
-                      <div className="text-sm">{job.location}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Period</div>
-                      <div className="text-sm">{job.period}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">Payment Date</div>
-                      <div className="text-sm">{job.paymentDate}</div>
-                    </div>
+                  <Badge variant={job.pendingAmount ? "secondary" : "default"}>{job.pendingAmount ? "Payment pending" : "Fully paid"}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-sm font-medium">Location</div>
+                  <div className="text-sm">{job.location}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium">Period</div>
+                  <div className="text-sm">
+                    {fmtDate(job.startDate)} - {fmtDate(job.endDate)}
                   </div>
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="text-sm font-medium">Total Earned</div>
-                        <div className="text-lg font-bold">{job.totalEarned}</div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium">Total Earned</div>
+                  <div className="text-lg font-bold">{inr(job.totalEarned)}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium">Pending</div>
+                  <div className="text-sm">{inr(job.pendingAmount)}</div>
+                </div>
+              </CardContent>
+              {job.pendingAmount > 0 && (
+                <CardFooter>
+                  <Button variant="outline" onClick={() => openReport(job)}>
+                    Report Issue
+                  </Button>
+                </CardFooter>
+              )}
+            </Card>
+          ))}
         </TabsContent>
       </Tabs>
 
-      {/* Report Issue Dialog */}
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+      <Dialog open={Boolean(currentJob)} onOpenChange={(open) => !open && setCurrentJob(null)}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Report Wage Issue</DialogTitle>
             <DialogDescription>
-              Report an issue with your wages for {currentJob?.title} at {currentJob?.employer}.
+              Report an issue with your wages for {currentJob?.title} at {currentJob?.employerName}. It is filed as a grievance the employer
+              must respond to.
             </DialogDescription>
           </DialogHeader>
 
-          {!reportSubmitted ? (
-            <form onSubmit={handleSubmitReport}>
+          {!created ? (
+            <form onSubmit={submitReport}>
               <div className="grid gap-4 py-4">
                 <div>
                   <Label className="mb-2 block">Issue Type</Label>
@@ -472,31 +414,23 @@ export default function WagesPage() {
                     </div>
                   </RadioGroup>
                 </div>
-
-                {issueType === "other" && (
-                  <div>
-                    <Label htmlFor="other-issue-description" className="mb-2 block">
-                      Please describe the issue
-                    </Label>
-                    <Textarea
-                      id="other-issue-description"
-                      placeholder="Describe your issue in detail..."
-                      value={otherIssueText}
-                      onChange={(e) => setOtherIssueText(e.target.value)}
-                      required
-                    />
-                  </div>
-                )}
-
                 <div>
                   <Label htmlFor="details" className="mb-2 block">
-                    Additional Details
+                    Details
                   </Label>
-                  <Textarea id="details" placeholder="Provide any additional details about the issue..." />
+                  <Textarea
+                    id="details"
+                    placeholder="What happened? Include dates and amounts if you can."
+                    value={details}
+                    onChange={(e) => setDetails(e.target.value)}
+                  />
                 </div>
+                {error && <p className="text-sm text-red-600">{error}</p>}
               </div>
               <DialogFooter>
-                <Button type="submit">Submit Report</Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? "Submitting..." : "Submit Report"}
+                </Button>
               </DialogFooter>
             </form>
           ) : (
@@ -504,12 +438,15 @@ export default function WagesPage() {
               <div className="rounded-full bg-green-100 p-3">
                 <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
-              <h3 className="text-xl font-semibold">Report Submitted Successfully!</h3>
-              <p className="text-muted-foreground">
-                Your wage issue report has been submitted. We will investigate and get back to you soon.
-              </p>
-              <p className="text-sm">Report Reference: REP-{Math.floor(Math.random() * 1000000)}</p>
-              <Button onClick={() => setShowReportDialog(false)}>Close</Button>
+              <h3 className="text-xl font-semibold">Report Submitted</h3>
+              <p className="text-muted-foreground">The employer has been notified and must respond.</p>
+              <p className="text-sm">Reference: {created.id}</p>
+              <div className="flex gap-2">
+                <Link href={`/grievances/${created.id}`}>
+                  <Button variant="outline">Track it</Button>
+                </Link>
+                <Button onClick={() => setCurrentJob(null)}>Close</Button>
+              </div>
             </div>
           )}
         </DialogContent>

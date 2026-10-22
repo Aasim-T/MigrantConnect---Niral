@@ -14,7 +14,9 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useSession } from "./session-provider"
+import { api } from "@/lib/api"
 import {
   Sidebar,
   SidebarContent,
@@ -28,10 +30,14 @@ import {
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, unread } = useSession()
+  const isWorker = user.role === "worker"
 
-  // Determine if user is worker or employer based on path
-  // This is a simplified approach - in a real app, you'd use auth context
-  const isWorker = !pathname.includes("/employer")
+  const logout = async () => {
+    await api("/api/auth/logout", { method: "POST" }).catch(() => {})
+    router.replace("/login")
+  }
 
   return (
     <div>
@@ -42,6 +48,9 @@ export function AppSidebar() {
               <div className="flex items-center gap-2 px-4 py-3">
                 <Users className="h-6 w-6" />
                 <span className="text-xl font-bold">MigrantConnect</span>
+              </div>
+              <div className="px-4 pb-3 text-sm text-muted-foreground truncate">
+                {isWorker ? user.name : user.companyName} · {user.id}
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -61,10 +70,20 @@ export function AppSidebar() {
                     </div>
                     <div>
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={pathname === "/jobs"}>
+                        <SidebarMenuButton asChild isActive={pathname.startsWith("/jobs")}>
                           <Link href="/jobs" className="flex items-center">
                             <Search className="h-5 w-5 mr-3" />
                             <span>Find Jobs</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </div>
+                    <div>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={pathname === "/applications"}>
+                          <Link href="/applications" className="flex items-center">
+                            <Briefcase className="h-5 w-5 mr-3" />
+                            <span>My Applications</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -81,7 +100,7 @@ export function AppSidebar() {
                     </div>
                     <div>
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild isActive={pathname === "/grievances"}>
+                        <SidebarMenuButton asChild isActive={pathname.startsWith("/grievances")}>
                           <Link href="/grievances" className="flex items-center">
                             <AlertCircle className="h-5 w-5 mr-3" />
                             <span>Grievances</span>
@@ -135,6 +154,16 @@ export function AppSidebar() {
                     </div>
                     <div>
                       <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={pathname === "/employer/applicants"}>
+                          <Link href="/employer/applicants" className="flex items-center">
+                            <Users className="h-5 w-5 mr-3" />
+                            <span>Applicants</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </div>
+                    <div>
+                      <SidebarMenuItem>
                         <SidebarMenuButton asChild isActive={pathname === "/employer/wages"}>
                           <Link href="/employer/wages" className="flex items-center">
                             <DollarSign className="h-5 w-5 mr-3" />
@@ -175,23 +204,24 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={isWorker ? pathname === "/notifications" : pathname === "/employer/employer-notifications"}
+                  isActive={isWorker ? pathname === "/notifications" : pathname === "/employer/notifications"}
                 >
                   <Link
-                    href={isWorker ? "/notifications" : "/employer/employer-notifications"}
+                    href={isWorker ? "/notifications" : "/employer/notifications"}
                     className="flex items-center"
                   >
                     <Bell className="h-5 w-5 mr-3" />
                     <span>Notifications</span>
+                    {unread > 0 && (
+                      <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">{unread}</span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link href="/login" className="flex items-center">
-                    <LogOut className="h-5 w-5 mr-3" />
-                    <span>Logout</span>
-                  </Link>
+                <SidebarMenuButton onClick={logout} className="flex items-center">
+                  <LogOut className="h-5 w-5 mr-3" />
+                  <span>Logout</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
