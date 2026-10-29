@@ -13,7 +13,6 @@ export default function Home() {
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check if language is already selected
     const storedLanguage = localStorage.getItem("preferredLanguage")
     if (storedLanguage) {
       setSelectedLanguage(storedLanguage)
@@ -33,7 +32,7 @@ export default function Home() {
       <AnimatePresence>
         {showLanguageSelector && (
           <Dialog open={showLanguageSelector} onOpenChange={setShowLanguageSelector}>
-            <DialogContent className="sm:max-w-md" hideClose>
+            <DialogContent className="sm:max-w-md">
               <motion.div
                 className="flex flex-col items-center justify-center space-y-6 py-6"
                 initial={{ opacity: 0, scale: 0.9 }}
