@@ -1,77 +1,60 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-// ThemeToggle has been removed
-import {
-  ChevronDown,
-  Menu,
-  X,
-  Globe,
-  Users,
-  Building2,
-  FileText,
-  CheckCircle,
-  Facebook,
-  Twitter,
-  Instagram,
-  Linkedin,
-  Briefcase,
-} from "lucide-react"
+import { motion, MotionConfig, type Variants } from "framer-motion"
+import { Building2, HardHat, Menu, X } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { RailField } from "@/components/rail-field"
+import { cn } from "@/lib/utils"
 
-// Language translations
 const translations = {
   english: {
-    nav: {
-      home: "Home",
-      about: "About Us",
-      services: "Our Services",
-      faq: "FAQ",
-      login: "Login",
-    },
+    nav: { about: "About", services: "What you can do", faq: "Questions", login: "Log in", menu: "Menu", language: "Language" },
     hero: {
-      title: "Empowering Migrant Workers with Digital Solutions",
+      title: "Verified work. Wages on record.",
       subtitle:
-        "A secure platform connecting workers with verified employers, ensuring fair wages and access to government welfare schemes.",
-      cta: "Get Started",
+        "Register once with Aadhaar to find jobs from verified employers, see every wage payment, and apply for government welfare schemes. Free for workers.",
+      worker: "Register as a worker",
+      employer: "Hire workers",
     },
     about: {
-      title: "Who We Are?",
+      title: "Every job and payment in one record",
       description:
-        "MigrantConnect is a digital platform designed to address the challenges faced by migrant workers in India. We provide a secure, transparent ecosystem that connects workers with verified employers, ensures fair wages, and facilitates access to government welfare schemes. Our mission is to empower migrant workers through technology and create a more equitable labor market.",
+        "MigrantConnect connects migrant workers in India with employers whose identity has been checked. Each job you take and each wage you are paid is recorded, so you have proof when you need it: to raise a complaint, to apply for a scheme, or to show your next employer.",
     },
     services: {
-      title: "Our Services",
-      aadhaar: {
-        title: "Aadhaar-Based Registration",
-        description:
-          "Secure identity verification using Aadhaar ensures authentic profiles for both workers and employers.",
-      },
-      jobs: {
-        title: "Job Matching & Tracking",
-        description:
-          "AI-powered job matching connects workers with suitable employment opportunities based on skills and location.",
-      },
-      welfare: {
-        title: "Welfare Scheme Access",
-        description:
-          "Simplified access to government welfare schemes with eligibility checking and application assistance.",
-      },
+      title: "What you can do",
+      items: [
+        {
+          title: "Register with Aadhaar",
+          description:
+            "Your identity is checked once with an OTP. Employers are checked by GSTIN, so you know who you are working for.",
+        },
+        {
+          title: "Find and apply for jobs",
+          description: "Search work by skill and city, see the monthly pay before you apply, and follow each application.",
+        },
+        {
+          title: "Track every wage",
+          description:
+            "Employers record the days you worked and the amount due. You see what is paid, what is pending, and when it is due.",
+        },
+        {
+          title: "Raise a grievance",
+          description:
+            "Report unpaid wages or unsafe work. The employer has to respond, and you can follow the case until it is resolved.",
+        },
+        {
+          title: "Apply for welfare schemes",
+          description: "Check which government schemes you qualify for and apply from your phone.",
+        },
+      ],
     },
     faq: {
-      title: "Frequently Asked Questions",
+      title: "Questions",
       questions: [
         {
           question: "How does Aadhaar-based registration work?",
@@ -90,52 +73,54 @@ const translations = {
         },
       ],
     },
-    footer: {
-      quickLinks: "Quick Links",
-      privacy: "Privacy Policy",
-      terms: "Terms of Use",
-      contact: "Contact Us",
-      rights: "© 2023 MigrantConnect. All rights reserved.",
-    },
+    login: { title: "Log in", description: "Choose how you use MigrantConnect.", worker: "I am a worker", employer: "I am an employer" },
+    footer: { privacy: "Privacy policy", terms: "Terms of use", contact: "Contact us", rights: "All rights reserved." },
   },
   tamil: {
-    nav: {
-      home: "முகப்பு",
-      about: "எங்களைப் பற்றி",
-      services: "எங்கள் சேவைகள்",
-      faq: "அடிக்கடி கேட்கப்படும் கேள்விகள்",
-      login: "உள்நுழைய",
-    },
+    nav: { about: "எங்களைப் பற்றி", services: "சேவைகள்", faq: "கேள்விகள்", login: "உள்நுழைய", menu: "பட்டி", language: "மொழி" },
     hero: {
-      title: "புலம்பெயர் தொழிலாளர்களுக்கு டிஜிட்டல் தீர்வுகள்",
+      title: "சரிபார்த்த வேலை. பதிவான ஊதியம்.",
       subtitle:
-        "சரிபார்க்கப்பட்ட முதலாளிகளுடன் தொழிலாளர்களை இணைக்கும், நியாயமான ஊதியங்களை உறுதிசெய்யும் மற்றும் அரசு நல திட்டங்களுக்கான அணுகலை வழங்கும் ஒரு பாதுகாப்பான தளம்.",
-      cta: "தொடங்குங்கள்",
+        "ஆதார் மூலம் ஒருமுறை பதிவு செய்யுங்கள்: சரிபார்க்கப்பட்ட முதலாளிகளிடம் வேலை தேடுங்கள், ஒவ்வொரு ஊதியத்தையும் பாருங்கள், அரசு நலத் திட்டங்களுக்கு விண்ணப்பியுங்கள். தொழிலாளர்களுக்கு இலவசம்.",
+      worker: "தொழிலாளராக பதிவு செய்க",
+      employer: "தொழிலாளர்களை நியமிக்க",
     },
     about: {
-      title: "நாங்கள் யார்?",
+      title: "ஒவ்வொரு வேலையும் ஊதியமும் ஒரே பதிவில்",
       description:
-        "MigrantConnect என்பது இந்தியாவில் புலம்பெயர் தொழிலாளர்கள் எதிர்கொள்ளும் சவால்களை நிவர்த்தி செய்ய வடிவமைக்கப்பட்ட ஒரு டிஜிட்டல் தளமாகும். நாங்கள் தொழிலாளர்களை சரிபார்க்கப்பட்ட முதலாளிகளுடன் இணைக்கும், நியாயமான ஊதியங்களை உறுதிசெய்யும் மற்றும் அரசு நல திட்டங்களுக்கான அணுகலை எளிதாக்கும் ஒரு பாதுகாப்பான, வெளிப்படையான சூழலை வழங்குகிறோம். தொழில்நுட்பத்தின் மூலம் புலம்பெயர் தொழிலாளர்களுக்கு அதிகாரம் அளிப்பதும், மேலும் சமத்துவமான தொழிலாளர் சந்தையை உருவாக்குவதும் எங்கள் நோக்கமாகும்.",
+        "MigrantConnect இந்தியாவில் உள்ள புலம்பெயர் தொழிலாளர்களை, அடையாளம் சரிபார்க்கப்பட்ட முதலாளிகளுடன் இணைக்கிறது. நீங்கள் செய்யும் ஒவ்வொரு வேலையும், பெறும் ஒவ்வொரு ஊதியமும் பதிவு செய்யப்படுகிறது. புகார் அளிக்க, திட்டத்திற்கு விண்ணப்பிக்க அல்லது அடுத்த முதலாளியிடம் காட்ட இது உங்களுக்கு ஆதாரமாகிறது.",
     },
     services: {
-      title: "எங்கள் சேவைகள்",
-      aadhaar: {
-        title: "ஆதார் அடிப்படையிலான பதிவு",
-        description:
-          "ஆதார் பயன்படுத்தி பாதுகாப்பான அடையாள சரிபார்ப்பு தொழிலாளர்கள் மற்றும் முதலாளிகள் இருவருக்கும் உண்மையான சுயவிவரங்களை உறுதிசெய்கிறது.",
-      },
-      jobs: {
-        title: "வேலை பொருத்தம் & கண்காணிப்பு",
-        description:
-          "AI-ஆல் இயக்கப்படும் வேலை பொருத்தம் திறன்கள் மற்றும் இருப்பிடத்தின் அடிப்படையில் தொழிலாளர்களை பொருத்தமான வேலைவாய்ப்புகளுடன் இணைக்கிறது.",
-      },
-      welfare: {
-        title: "நல திட்ட அணுகல்",
-        description: "தகுதி சரிபார்ப்பு மற்றும் விண்ணப்ப உதவியுடன் அரசு நல திட்டங்களுக்கான எளிமையாக்கப்பட்ட அணுகல்.",
-      },
+      title: "நீங்கள் செய்யக்கூடியவை",
+      items: [
+        {
+          title: "ஆதார் மூலம் பதிவு",
+          description:
+            "OTP மூலம் உங்கள் அடையாளம் ஒருமுறை சரிபார்க்கப்படும். முதலாளிகள் GSTIN மூலம் சரிபார்க்கப்படுவதால், யாரிடம் வேலை செய்கிறீர்கள் என்பது உங்களுக்குத் தெரியும்.",
+        },
+        {
+          title: "வேலை தேடி விண்ணப்பிக்க",
+          description:
+            "திறன் மற்றும் நகரத்தின்படி வேலை தேடுங்கள், விண்ணப்பிக்கும் முன் மாத ஊதியத்தைப் பாருங்கள், ஒவ்வொரு விண்ணப்பத்தையும் பின்தொடருங்கள்.",
+        },
+        {
+          title: "ஒவ்வொரு ஊதியத்தையும் கண்காணிக்க",
+          description:
+            "நீங்கள் வேலை செய்த நாட்களையும் தர வேண்டிய தொகையையும் முதலாளி பதிவு செய்வார். எது செலுத்தப்பட்டது, எது நிலுவையில் உள்ளது, எப்போது செலுத்த வேண்டும் என்பதைப் பார்க்கலாம்.",
+        },
+        {
+          title: "புகார் அளிக்க",
+          description:
+            "செலுத்தப்படாத ஊதியம் அல்லது பாதுகாப்பற்ற வேலை குறித்து புகார் செய்யுங்கள். முதலாளி பதிலளிக்க வேண்டும்; தீர்வு கிடைக்கும் வரை நீங்கள் பின்தொடரலாம்.",
+        },
+        {
+          title: "நலத் திட்டங்களுக்கு விண்ணப்பிக்க",
+          description: "உங்களுக்குத் தகுதியான அரசு திட்டங்களைச் சரிபார்த்து, உங்கள் கைபேசியிலிருந்தே விண்ணப்பியுங்கள்.",
+        },
+      ],
     },
     faq: {
-      title: "அடிக்கடி கேட்கப்படும் கேள்விகள்",
+      title: "கேள்விகள்",
       questions: [
         {
           question: "ஆதார் அடிப்படையிலான பதிவு எவ்வாறு செயல்படுகிறது?",
@@ -154,51 +139,53 @@ const translations = {
         },
       ],
     },
-    footer: {
-      quickLinks: "விரைவு இணைப்புகள்",
-      privacy: "தனியுரிமைக் கொள்கை",
-      terms: "பயன்பாட்டு விதிமுறைகள்",
-      contact: "எங்களை தொடர்பு கொள்ள",
-      rights: "© 2023 MigrantConnect. அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.",
-    },
+    login: { title: "உள்நுழைய", description: "நீங்கள் யார் என்பதைத் தேர்வுசெய்யுங்கள்.", worker: "நான் தொழிலாளர்", employer: "நான் முதலாளி" },
+    footer: { privacy: "தனியுரிமைக் கொள்கை", terms: "பயன்பாட்டு விதிமுறைகள்", contact: "தொடர்பு கொள்ள", rights: "அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை." },
   },
   hindi: {
-    nav: {
-      home: "होम",
-      about: "हमारे बारे में",
-      services: "हमारी सेवाएँ",
-      faq: "अक्सर पूछे जाने वाले प्रश्न",
-      login: "लॉगिन",
-    },
+    nav: { about: "हमारे बारे में", services: "सेवाएँ", faq: "प्रश्न", login: "लॉगिन", menu: "मेनू", language: "भाषा" },
     hero: {
-      title: "प्रवासी श्रमिकों को डिजिटल समाधानों के साथ सशक्त बनाना",
+      title: "सत्यापित काम। दर्ज मज़दूरी।",
       subtitle:
-        "एक सुरक्षित प्लेटफॉर्म जो श्रमिकों को सत्यापित नियोक्ताओं से जोड़ता है, उचित मजदूरी सुनिश्चित करता है और सरकारी कल्याण योजनाओं तक पहुंच प्रदान करता है।",
-      cta: "शुरू करें",
+        "आधार से एक बार पंजीकरण करें: सत्यापित नियोक्ताओं से काम खोजें, हर मज़दूरी भुगतान देखें, और सरकारी कल्याण योजनाओं के लिए आवेदन करें। श्रमिकों के लिए मुफ़्त।",
+      worker: "श्रमिक के रूप में पंजीकरण करें",
+      employer: "श्रमिक नियुक्त करें",
     },
     about: {
-      title: "हम कौन हैं?",
+      title: "हर काम और हर भुगतान, एक ही रिकॉर्ड में",
       description:
-        "MigrantConnect एक डिजिटल प्लेटफॉर्म है जिसे भारत में प्रवासी श्रमिकों द्वारा सामना की जाने वाली चुनौतियों का समाधान करने के लिए डिज़ाइन किया गया है। हम एक सुरक्षित, पारदर्शी पारिस्थितिकी तंत्र प्रदान करते हैं जो श्रमिकों को सत्यापित नियोक्ताओं से जोड़ता है, उचित मजदूरी सुनिश्चित करता है, और सरकारी कल्याण योजनाओं तक पहुंच की सुविधा प्रदान करता है। हमारा मिशन प्रौद्योगिकी के माध्यम से प्रवासी श्रमिकों को सशक्त बनाना और एक अधिक न्यायसंगत श्रम बाजार बनाना है।",
+        "MigrantConnect भारत के प्रवासी श्रमिकों को उन नियोक्ताओं से जोड़ता है जिनकी पहचान जाँची गई है। आपका हर काम और हर मज़दूरी भुगतान दर्ज होता है, ताकि ज़रूरत पड़ने पर आपके पास सबूत रहे: शिकायत करने, किसी योजना के लिए आवेदन करने या अगले नियोक्ता को दिखाने के लिए।",
     },
     services: {
-      title: "हमारी सेवाएँ",
-      aadhaar: {
-        title: "आधार-आधारित पंजीकरण",
-        description:
-          "आधार का उपयोग करके सुरक्षित पहचान सत्यापन श्रमिकों और नियोक्ताओं दोनों के लिए प्रामाणिक प्रोफाइल सुनिश्चित करता है।",
-      },
-      jobs: {
-        title: "नौकरी मिलान और ट्रैकिंग",
-        description: "AI-संचालित नौकरी मिलान श्रमिकों को कौशल और स्थान के आधार पर उपयुक्त रोजगार के अवसरों से जोड़ता है।",
-      },
-      welfare: {
-        title: "कल्याण योजना पहुंच",
-        description: "पात्रता जांच और आवेदन सहायता के साथ सरकारी कल्याण योजनाओं तक सरलीकृत पहुंच।",
-      },
+      title: "आप क्या कर सकते हैं",
+      items: [
+        {
+          title: "आधार से पंजीकरण",
+          description:
+            "OTP से आपकी पहचान एक बार जाँची जाती है। नियोक्ताओं की जाँच GSTIN से होती है, ताकि आपको पता रहे कि आप किसके लिए काम कर रहे हैं।",
+        },
+        {
+          title: "काम खोजें और आवेदन करें",
+          description: "कौशल और शहर के हिसाब से काम खोजें, आवेदन से पहले मासिक वेतन देखें, और हर आवेदन की स्थिति जानें।",
+        },
+        {
+          title: "हर मज़दूरी का हिसाब",
+          description:
+            "नियोक्ता आपके काम के दिन और देय राशि दर्ज करते हैं। आप देख सकते हैं कि क्या मिला, क्या बाकी है, और कब तक मिलना है।",
+        },
+        {
+          title: "शिकायत दर्ज करें",
+          description:
+            "बकाया मज़दूरी या असुरक्षित काम की शिकायत करें। नियोक्ता को जवाब देना होता है, और समाधान तक आप मामले को देख सकते हैं।",
+        },
+        {
+          title: "कल्याण योजनाओं के लिए आवेदन",
+          description: "देखें कि आप किन सरकारी योजनाओं के पात्र हैं और अपने फ़ोन से ही आवेदन करें।",
+        },
+      ],
     },
     faq: {
-      title: "अक्सर पूछे जाने वाले प्रश्न",
+      title: "प्रश्न",
       questions: [
         {
           question: "आधार-आधारित पंजीकरण कैसे काम करता है?",
@@ -217,544 +204,416 @@ const translations = {
         },
       ],
     },
-    footer: {
-      quickLinks: "त्वरित लिंक",
-      privacy: "गोपनीयता नीति",
-      terms: "उपयोग की शर्तें",
-      contact: "संपर्क करें",
-      rights: "© 2023 MigrantConnect. सर्वाधिकार सुरक्षित।",
-    },
+    login: { title: "लॉगिन", description: "चुनें कि आप MigrantConnect का उपयोग कैसे करते हैं।", worker: "मैं श्रमिक हूँ", employer: "मैं नियोक्ता हूँ" },
+    footer: { privacy: "गोपनीयता नीति", terms: "उपयोग की शर्तें", contact: "संपर्क करें", rights: "सर्वाधिकार सुरक्षित।" },
   },
 }
 
 type LanguageKey = keyof typeof translations
 
-interface LandingPageProps {
-  language: string
+// Station boards in India carry one name in several scripts; the language switch reads the same way
+const LANGUAGES: { key: LanguageKey; label: string; lang: string }[] = [
+  { key: "english", label: "English", lang: "en" },
+  { key: "tamil", label: "தமிழ்", lang: "ta" },
+  { key: "hindi", label: "हिन्दी", lang: "hi" },
+]
+
+const rise: Variants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+}
+const stagger: Variants = { hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }
+
+function LanguageBoard({ value, onChange, label }: { value: LanguageKey; onChange: (l: LanguageKey) => void; label: string }) {
+  return (
+    <div role="group" aria-label={label} className="grid grid-cols-3 md:flex md:flex-col md:items-stretch">
+      {LANGUAGES.map((l) => {
+        const active = l.key === value
+        return (
+          <button
+            key={l.key}
+            lang={l.lang}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(l.key)}
+            className={cn(
+              "min-h-12 px-3 py-2 text-center text-xl font-bold tracking-tight transition-colors duration-200 md:px-4 md:text-left md:text-[1.75rem]",
+              "focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ink",
+              active ? "bg-ink text-signal" : "text-ink hover:bg-ink/10",
+            )}
+          >
+            {l.label}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
-export function LandingPage({ language }: LandingPageProps) {
-  const router = useRouter()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [languageMenuOpen, setLanguageMenuOpen] = useState(false)
-  const [loginDialogOpen, setLoginDialogOpen] = useState(false)
-  const [expandedFAQs, setExpandedFAQs] = useState<number[]>([])
-  const [scrolled, setScrolled] = useState(false)
-  const [theme, setTheme] = useState<string | null>(null)
+function WageSlip() {
+  return (
+    <div data-ui className="w-full max-w-[380px] bg-white p-6 text-ink shadow-[0_24px_48px_-24px_rgba(20,20,20,0.35)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm text-ink/60">Wage record WAGE-401</p>
+          <p className="mt-1 text-lg font-semibold">Construction Worker</p>
+          <p className="text-sm text-ink/70">ABC Construction Company</p>
+        </div>
+        <span className="rounded-full bg-[#DCEBDD] px-3 py-1 text-sm font-medium text-[#1E5B2A]">Paid</span>
+      </div>
+      <dl className="mt-6 grid grid-cols-2 gap-y-3 text-sm">
+        <dt className="text-ink/60">Days worked</dt>
+        <dd className="text-right tabular-nums">22</dd>
+        <dt className="text-ink/60">Daily wage</dt>
+        <dd className="text-right tabular-nums">₹650</dd>
+        <dt className="text-ink/60">Paid by</dt>
+        <dd className="text-right">Bank transfer</dd>
+        <dt className="text-ink/60">Reference</dt>
+        <dd className="text-right tabular-nums">TRX-7A31C9</dd>
+      </dl>
+      <div className="mt-6 flex items-baseline justify-between bg-paper px-4 py-3">
+        <span className="text-sm text-ink/70">Amount</span>
+        <span className="text-2xl font-bold tabular-nums">₹14,300</span>
+      </div>
+    </div>
+  )
+}
 
-  // Ensure language is a valid key, default to English if not
-  const safeLanguage = translations[language as LanguageKey] ? (language as LanguageKey) : "english"
-  const t = translations[safeLanguage]
+function JobListing() {
+  return (
+    <div data-ui className="w-full max-w-[340px] bg-ink p-6 text-white shadow-[0_24px_48px_-24px_rgba(20,20,20,0.5)]">
+      <p className="text-lg font-semibold">Carpenter</p>
+      <p className="text-sm text-white/70">Kanchipuram · Full-time</p>
+      <p className="mt-5 text-2xl font-bold tabular-nums text-signal">₹18,000–22,000</p>
+      <p className="text-sm text-white/70">a month, 9 hours a day</p>
+      <ul className="mt-5 flex flex-wrap gap-2 text-sm">
+        <li className="bg-white/10 px-3 py-1">Accommodation provided</li>
+        <li className="bg-white/10 px-3 py-1">Overtime pay</li>
+      </ul>
+      <span className="mt-6 inline-flex h-11 w-full items-center justify-center bg-signal font-semibold text-ink">Apply</span>
+    </div>
+  )
+}
+
+export function LandingPage() {
+  const router = useRouter()
+  const [language, setLanguage] = useState<LanguageKey>("english")
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false)
+  const t = translations[language]
+  const langCode = LANGUAGES.find((l) => l.key === language)!.lang
+  const indic = language !== "english"
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10)
-    }
-
-    // Get the current theme from localStorage
-    const storedTheme = localStorage.getItem("theme")
-    if (storedTheme) {
-      setTheme(storedTheme)
-      // Apply the theme to the document
-      document.documentElement.classList.toggle("dark", storedTheme === "dark")
-    } else {
-      // Default to light theme if not set
-      setTheme("light")
-      document.documentElement.classList.remove("dark")
-    }
-
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
+    try {
+      const stored = localStorage.getItem("preferredLanguage")
+      if (stored && stored in translations) setLanguage(stored as LanguageKey)
+    } catch {}
+    // The landing page is designed for the light theme
+    document.documentElement.classList.remove("dark")
   }, [])
 
-  const toggleFAQ = (index: number) => {
-    if (expandedFAQs.includes(index)) {
-      setExpandedFAQs(expandedFAQs.filter((i) => i !== index))
-    } else {
-      setExpandedFAQs([...expandedFAQs, index])
-    }
+  useEffect(() => {
+    document.documentElement.lang = langCode
+  }, [langCode])
+
+  const changeLanguage = (l: LanguageKey) => {
+    setLanguage(l)
+    try {
+      localStorage.setItem("preferredLanguage", l)
+    } catch {}
   }
 
-  const handleLanguageChange = (newLanguage: string) => {
-    localStorage.setItem("preferredLanguage", newLanguage)
-    window.location.reload()
-  }
-
-  const handleLogin = (type: string) => {
+  const handleLogin = (type: "worker" | "employer") => {
     setLoginDialogOpen(false)
     router.push(`/login?type=${type}`)
   }
 
-  const fadeIn = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6 },
-    },
-  }
-
-  const staggerContainer = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2,
-      },
-    },
-  }
+  const navLinks = [
+    { href: "#about", label: t.nav.about },
+    { href: "#services", label: t.nav.services },
+    { href: "#faq", label: t.nav.faq },
+  ]
 
   return (
-    <div className="flex min-h-screen flex-col dark:bg-gray-900 dark:text-gray-100 transition-colors duration-300">
-      {/* Header */}
-      <header
-        className={`sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:bg-gray-900/95 dark:border-gray-800 transition-all duration-300 ${scrolled ? "shadow-md" : ""}`}
-      >
-        <div className="container flex h-16 items-center justify-between px-8">
-          <div className="flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            <span className="text-xl font-bold">MigrantConnect</span>
-          </div>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            <a href="#home" className="text-sm font-medium hover:text-primary">
-              {t.nav.home}
-            </a>
-            <a href="#about" className="text-sm font-medium hover:text-primary">
-              {t.nav.about}
-            </a>
-            <a href="#services" className="text-sm font-medium hover:text-primary">
-              {t.nav.services}
-            </a>
-            <a href="#faq" className="text-sm font-medium hover:text-primary">
-              {t.nav.faq}
-            </a>
-
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1"
-                onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
+    <MotionConfig reducedMotion="user">
+      <div lang={langCode} className="mc-landing flex min-h-screen flex-col overflow-x-clip bg-white text-ink">
+        {/* Hero: the station board */}
+        <section id="home" className="relative isolate flex min-h-[min(100svh,1000px)] flex-col overflow-hidden bg-signal">
+          <header className="mx-auto flex w-full max-w-[1440px] items-center justify-between px-4 py-5 md:px-8">
+            <Link href="/" className="text-xl font-extrabold tracking-tight md:text-2xl" style={{ fontStretch: "88%" }}>
+              MigrantConnect
+            </Link>
+            <nav className="hidden items-center gap-8 md:flex" aria-label="Main">
+              {navLinks.map((l) => (
+                <a key={l.href} href={l.href} className="text-base font-medium underline-offset-[6px] hover:underline">
+                  {l.label}
+                </a>
+              ))}
+              <button
+                type="button"
+                onClick={() => setLoginDialogOpen(true)}
+                className="h-11 bg-ink px-6 font-semibold text-signal transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
               >
-                <Globe className="h-4 w-4" />
-                {safeLanguage === "english" ? "English" : safeLanguage === "tamil" ? "தமிழ்" : "हिन्दी"}
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-
-              {languageMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-background dark:bg-gray-800 ring-1 ring-black ring-opacity-5 dark:ring-gray-700">
-                  <div className="py-1" role="menu" aria-orientation="vertical">
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-700"
-                      onClick={() => handleLanguageChange("english")}
-                    >
-                      English
-                    </button>
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-700"
-                      onClick={() => handleLanguageChange("tamil")}
-                    >
-                      தமிழ் (Tamil)
-                    </button>
-                    <button
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-700"
-                      onClick={() => handleLanguageChange("hindi")}
-                    >
-                      हिन्दी (Hindi)
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Theme toggle removed */}
-
-            <Dialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>{t.nav.login}</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>{t.nav.login}</DialogTitle>
-                  <DialogDescription>Choose your account type to continue</DialogDescription>
-                </DialogHeader>
-                <div className="grid grid-cols-2 gap-4 py-4">
-                  <Button
-                    className="flex flex-col items-center justify-center h-32 gap-2"
-                    onClick={() => handleLogin("worker")}
-                  >
-                    <Users className="h-8 w-8" />
-                    <span>Worker Login</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex flex-col items-center justify-center h-32 gap-2"
-                    onClick={() => handleLogin("employer")}
-                  >
-                    <Building2 className="h-8 w-8" />
-                    <span>Employer Login</span>
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </nav>
-
-          {/* Mobile Menu Button */}
-          <div className="flex items-center gap-2 md:hidden">
-            {/* Theme toggle removed */}
+                {t.nav.login}
+              </button>
+            </nav>
             <button
-              className="inline-flex items-center justify-center rounded-md p-2 hover:bg-accent hover:text-accent-foreground"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              type="button"
+              className="inline-flex h-11 w-11 items-center justify-center md:hidden"
+              aria-label={t.nav.menu}
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((o) => !o)}
             >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
-          </div>
-        </div>
+          </header>
 
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden py-4 px-4 bg-background dark:bg-gray-900 border-t dark:border-gray-800">
-            <div className="flex flex-col space-y-4">
-              <div className="dropdown w-full">
-                <a
-                  href="#home"
-                  className="text-sm font-medium hover:text-primary block py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {t.nav.home}
-                </a>
-              </div>
-              <div className="dropdown w-full">
-                <a
-                  href="#about"
-                  className="text-sm font-medium hover:text-primary block py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {t.nav.about}
-                </a>
-              </div>
-              <div className="dropdown w-full">
-                <a
-                  href="#services"
-                  className="text-sm font-medium hover:text-primary block py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {t.nav.services}
-                </a>
-              </div>
-              <div className="dropdown w-full">
-                <a
-                  href="#faq"
-                  className="text-sm font-medium hover:text-primary block py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {t.nav.faq}
-                </a>
-              </div>
-              \
-              <div className="pt-2 border-t dark:border-gray-800">
-                <div className="dropdown w-full relative">
-                  <button
-                    className="flex items-center justify-between w-full text-sm font-medium py-2"
-                    onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
-                  >
-                    <span>Language</span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${languageMenuOpen ? "rotate-180" : ""}`} />
-                  </button>
-                  {languageMenuOpen && (
-                    <div className="mt-1 py-1 bg-background dark:bg-gray-800 border rounded-md dark:border-gray-700">
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-700"
-                        onClick={() => handleLanguageChange("english")}
-                      >
-                        English
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-700"
-                        onClick={() => handleLanguageChange("tamil")}
-                      >
-                        தமிழ் (Tamil)
-                      </button>
-                      <button
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground dark:hover:bg-gray-700"
-                        onClick={() => handleLanguageChange("hindi")}
-                      >
-                        हिन्दी (Hindi)
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <Button
-                className="w-full mt-2"
+          {mobileMenuOpen && (
+            <div className="mx-4 bg-ink p-4 text-white md:hidden">
+              <nav className="flex flex-col" aria-label="Main">
+                {navLinks.map((l) => (
+                  <a key={l.href} href={l.href} className="py-3 text-lg font-medium" onClick={() => setMobileMenuOpen(false)}>
+                    {l.label}
+                  </a>
+                ))}
+              </nav>
+              <button
+                type="button"
+                className="mt-3 h-12 w-full bg-signal font-semibold text-ink"
                 onClick={() => {
                   setMobileMenuOpen(false)
                   setLoginDialogOpen(true)
                 }}
               >
                 {t.nav.login}
-              </Button>
+              </button>
             </div>
-          </div>
-        )}
-      </header>
+          )}
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section
-          id="home"
-          className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-muted/50 to-muted dark:from-gray-900 dark:to-gray-800 transition-colors duration-300"
-        >
-          <div className="container px-4 md:px-6">
-            <motion.div
-              className="flex flex-col items-center justify-center space-y-4 text-center"
-              initial="hidden"
-              animate="visible"
-              variants={staggerContainer}
-            >
-              <motion.div className="space-y-2" variants={fadeIn}>
-                <h1
-                  className={`text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl ${safeLanguage !== "english" ? "leading-relaxed leading-loose" : ""}`}
+          <motion.div
+            className="mx-auto grid w-full max-w-[1440px] gap-8 px-4 pt-4 md:grid-cols-12 md:gap-10 md:px-8 md:pt-16"
+            initial="hidden"
+            animate="visible"
+            variants={stagger}
+          >
+            <div className="order-2 md:order-none md:col-span-9">
+              <motion.h1
+                key={language}
+                variants={rise}
+                className={cn(
+                  "max-w-[14ch] font-extrabold text-ink",
+                  indic
+                    ? "text-[2.5rem] leading-[1.2] tracking-normal sm:text-6xl lg:text-[5.25rem]"
+                    : "text-[3.25rem] leading-[0.92] tracking-[-0.035em] sm:text-7xl lg:text-[7.5rem]",
+                )}
+                style={{ fontStretch: indic ? undefined : "82%" }}
+              >
+                {t.hero.title}
+              </motion.h1>
+              <motion.p
+                variants={rise}
+                className={cn("mt-8 max-w-[52ch] text-lg md:text-xl", indic ? "leading-[1.75]" : "leading-relaxed")}
+              >
+                {t.hero.subtitle}
+              </motion.p>
+              <motion.div variants={rise} className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/register?type=worker"
+                  className="inline-flex h-14 items-center justify-center bg-ink px-8 text-lg font-semibold text-signal transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
                 >
-                  {t.hero.title}
-                </h1>
-                <p
-                  className={`mx-auto max-w-[700px] text-muted-foreground dark:text-gray-400 md:text-xl ${safeLanguage !== "english" ? "leading-10" : ""}`}
+                  {t.hero.worker}
+                </Link>
+                <Link
+                  href="/register?type=employer"
+                  className="inline-flex h-14 items-center justify-center bg-white px-8 text-lg font-semibold text-ink transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0"
                 >
-                  {t.hero.subtitle}
-                </p>
-              </motion.div>
-              <motion.div variants={fadeIn}>
-                <Link href="/register">
-                  <Button size="lg" className="px-8">
-                    {t.hero.cta}
-                  </Button>
+                  {t.hero.employer}
                 </Link>
               </motion.div>
+            </div>
+            <motion.div variants={rise} className="order-1 md:order-none md:col-span-3 md:justify-self-end">
+              <div className="w-full bg-signal md:w-56">
+                <LanguageBoard value={language} onChange={changeLanguage} label={t.nav.language} />
+              </div>
             </motion.div>
-          </div>
+          </motion.div>
+          <RailField className="relative mt-6 min-h-[300px] flex-1 md:mt-4 md:min-h-[340px]" />
         </section>
 
-        {/* About Us Section */}
-        <section id="about" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
+        <main className="flex-1">
+          {/* About: the record is the product */}
+          <section id="about" className="mx-auto w-full max-w-[1440px] px-4 py-24 md:px-8 md:py-40">
             <motion.div
-              className="grid gap-6 lg:grid-cols-2 lg:gap-12 items-center"
+              className="grid items-center gap-16 md:grid-cols-12"
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true }}
-              variants={staggerContainer}
+              viewport={{ once: true, margin: "-15% 0px" }}
+              variants={stagger}
             >
-              <motion.div className="space-y-4 px-4" variants={fadeIn}>
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl text-center lg:text-left">
+              <div className="md:col-span-6">
+                <motion.h2
+                  variants={rise}
+                  className={cn(
+                    "max-w-[16ch] text-4xl font-extrabold md:text-6xl",
+                    indic ? "leading-[1.25]" : "leading-[0.98] tracking-[-0.03em]",
+                  )}
+                  style={{ fontStretch: indic ? undefined : "85%" }}
+                >
                   {t.about.title}
-                </h2>
-                <p
-                  className={`text-muted-foreground dark:text-gray-400 md:text-lg ${safeLanguage !== "english" ? "leading-9" : "leading-relaxed"}`}
+                </motion.h2>
+                <motion.p
+                  variants={rise}
+                  className={cn("mt-8 max-w-[58ch] text-lg md:text-xl", indic ? "leading-[1.85]" : "leading-relaxed")}
                 >
                   {t.about.description}
-                </p>
-              </motion.div>
-              <motion.div
-                className="mx-auto w-full max-w-[500px] overflow-hidden rounded-xl border border-muted dark:border-gray-800 shadow-lg"
-                variants={fadeIn}
-              >
-                <Image
-                  src="/placeholder.svg?height=400&width=500"
-                  alt="Migrant workers using technology"
-                  width={500}
-                  height={400}
-                  className="w-full h-auto"
-                />
-              </motion.div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Services Section */}
-        <section
-          id="services"
-          className="w-full py-12 md:py-24 lg:py-32 bg-muted dark:bg-gray-800 transition-colors duration-300"
-        >
-          <div className="container px-4 md:px-6">
-            <motion.div
-              className="flex flex-col items-center justify-center space-y-4 text-center"
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeIn}
-            >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">{t.services.title}</h2>
+                </motion.p>
               </div>
-            </motion.div>
-
-            <motion.div
-              className="mx-auto grid max-w-5xl grid-cols-1 gap-6 py-12 md:grid-cols-3"
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={staggerContainer}
-            >
-              <motion.div
-                className="flex flex-col items-center space-y-4 rounded-lg border bg-background dark:bg-gray-900 dark:border-gray-700 p-6 text-center shadow-sm hover:shadow-md transition-shadow duration-300"
-                variants={fadeIn}
-                whileHover={{ y: -5 }}
-              >
-                <div className="rounded-full bg-primary/10 p-4">
-                  <CheckCircle className="h-6 w-6 text-primary" />
+              <motion.div variants={rise} className="relative md:col-span-6">
+                <div className="bg-paper px-6 pb-16 pt-10 md:px-12 md:pb-24 md:pt-14">
+                  <WageSlip />
                 </div>
-                <h3 className="text-xl font-bold">{t.services.aadhaar.title}</h3>
-                <p className="text-muted-foreground dark:text-gray-400">{t.services.aadhaar.description}</p>
-              </motion.div>
-
-              <motion.div
-                className="flex flex-col items-center space-y-4 rounded-lg border bg-background dark:bg-gray-900 dark:border-gray-700 p-6 text-center shadow-sm hover:shadow-md transition-shadow duration-300"
-                variants={fadeIn}
-                whileHover={{ y: -5 }}
-              >
-                <div className="rounded-full bg-primary/10 p-4">
-                  <Briefcase className="h-6 w-6 text-primary" />
+                <div className="-mt-12 flex justify-end pr-4 md:-mt-28 md:pr-0">
+                  <JobListing />
                 </div>
-                <h3 className="text-xl font-bold">{t.services.jobs.title}</h3>
-                <p className="text-muted-foreground dark:text-gray-400">{t.services.jobs.description}</p>
-              </motion.div>
-
-              <motion.div
-                className="flex flex-col items-center space-y-4 rounded-lg border bg-background dark:bg-gray-900 dark:border-gray-700 p-6 text-center shadow-sm hover:shadow-md transition-shadow duration-300"
-                variants={fadeIn}
-                whileHover={{ y: -5 }}
-              >
-                <div className="rounded-full bg-primary/10 p-4">
-                  <FileText className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold">{t.services.welfare.title}</h3>
-                <p className="text-muted-foreground dark:text-gray-400">{t.services.welfare.description}</p>
               </motion.div>
             </motion.div>
-          </div>
-        </section>
+          </section>
 
-        {/* FAQ Section */}
-        <section id="faq" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
-            <motion.div
-              className="flex flex-col items-center justify-center space-y-4 text-center"
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeIn}
-            >
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">{t.faq.title}</h2>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="mx-auto max-w-3xl space-y-4 py-12"
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={staggerContainer}
-            >
-              {t.faq.questions.map((faq, index) => (
-                <motion.div
-                  key={index}
-                  className="rounded-lg border bg-background dark:bg-gray-900 dark:border-gray-700 shadow-sm"
-                  variants={fadeIn}
-                >
-                  <button
-                    className="flex w-full items-center justify-between p-4 text-left"
-                    onClick={() => toggleFAQ(index)}
+          {/* Services: a departures board */}
+          <section id="services" className="bg-ink text-white">
+            <div className="mx-auto w-full max-w-[1440px] px-4 py-24 md:px-8 md:py-40">
+              <motion.h2
+                className={cn(
+                  "text-4xl font-extrabold text-signal md:text-6xl",
+                  indic ? "leading-[1.25]" : "leading-none tracking-[-0.03em]",
+                )}
+                style={{ fontStretch: indic ? undefined : "85%" }}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-15% 0px" }}
+                variants={rise}
+              >
+                {t.services.title}
+              </motion.h2>
+              <motion.ul
+                className="mt-16 md:mt-24"
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-10% 0px" }}
+                variants={stagger}
+              >
+                {t.services.items.map((s) => (
+                  <motion.li
+                    key={s.title}
+                    variants={rise}
+                    className="group grid gap-3 py-8 transition-colors duration-200 hover:bg-white/[0.04] md:grid-cols-12 md:gap-8 md:px-4 md:py-10 [&+&]:mt-1"
                   >
-                    <h3 className="text-lg font-medium">{faq.question}</h3>
-                    <ChevronDown
-                      className={`h-5 w-5 transition-transform ${expandedFAQs.includes(index) ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {expandedFAQs.includes(index) && (
-                    <motion.div
-                      className="border-t dark:border-gray-700 p-4"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3 }}
+                    <h3
+                      className={cn(
+                        "text-2xl font-bold md:col-span-5 md:text-[2.5rem]",
+                        indic ? "leading-[1.35]" : "leading-tight tracking-[-0.02em]",
+                      )}
                     >
-                      <p
-                        className={`text-muted-foreground dark:text-gray-400 ${safeLanguage !== "english" ? "leading-8" : ""}`}
-                      >
-                        {faq.answer}
-                      </p>
-                    </motion.div>
-                  )}
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="w-full border-t dark:border-gray-800 py-6 md:py-0 bg-background dark:bg-gray-900 transition-colors duration-300">
-        <div className="container flex flex-col md:h-24 md:flex-row md:items-center md:justify-between px-8">
-          <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-            <div className="flex items-center gap-2">
-              <Users className="h-6 w-6" />
-              <span className="text-xl font-bold">MigrantConnect</span>
+                      {s.title}
+                    </h3>
+                    <p className={cn("text-lg text-white/80 md:col-span-6 md:col-start-7", indic ? "leading-[1.8]" : "leading-relaxed")}>
+                      {s.description}
+                    </p>
+                  </motion.li>
+                ))}
+              </motion.ul>
             </div>
-            <p className="text-sm text-muted-foreground dark:text-gray-400">{t.footer.rights}</p>
-          </div>
+          </section>
 
-          <div className="mt-4 md:mt-0">
-            <div className="flex flex-col md:flex-row gap-4 md:items-center">
-              <div className="flex flex-col md:flex-row gap-2 md:gap-4">
-                <Link href="#" className="text-sm text-muted-foreground dark:text-gray-400 hover:underline">
+          {/* Questions */}
+          <section id="faq" className="mx-auto w-full max-w-[1440px] px-4 py-24 md:px-8 md:py-40">
+            <div className="grid gap-12 md:grid-cols-12">
+              <motion.h2
+                className={cn(
+                  "text-4xl font-extrabold md:col-span-4 md:text-6xl",
+                  indic ? "leading-[1.25]" : "leading-none tracking-[-0.03em]",
+                )}
+                style={{ fontStretch: indic ? undefined : "85%" }}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={rise}
+              >
+                {t.faq.title}
+              </motion.h2>
+              <Accordion type="multiple" className="md:col-span-7 md:col-start-6">
+                {t.faq.questions.map((f, i) => (
+                  <AccordionItem key={i} value={`q${i}`} className="border-ink/15">
+                    <AccordionTrigger className="py-6 text-left text-xl font-semibold hover:no-underline md:text-2xl">
+                      {f.question}
+                    </AccordionTrigger>
+                    <AccordionContent className={cn("pb-6 text-lg", indic ? "leading-[1.85]" : "leading-relaxed")}>
+                      {f.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          </section>
+        </main>
+
+        {/* Footer: the name returns at full width */}
+        <footer className="bg-signal">
+          <div className="mx-auto w-full max-w-[1440px] px-4 pb-8 pt-16 md:px-8 md:pt-24">
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+              <nav className="flex flex-wrap gap-x-8 gap-y-2" aria-label="Footer">
+                <Link href="#" className="text-base font-medium underline-offset-[6px] hover:underline">
                   {t.footer.privacy}
                 </Link>
-                <Link href="#" className="text-sm text-muted-foreground dark:text-gray-400 hover:underline">
+                <Link href="#" className="text-base font-medium underline-offset-[6px] hover:underline">
                   {t.footer.terms}
                 </Link>
-                <Link href="#" className="text-sm text-muted-foreground dark:text-gray-400 hover:underline">
+                <Link href="#" className="text-base font-medium underline-offset-[6px] hover:underline">
                   {t.footer.contact}
                 </Link>
-              </div>
-
-              <div className="flex items-center gap-2 mt-2 md:mt-0">
-                <Link
-                  href="#"
-                  className="text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white"
-                >
-                  <Facebook className="h-5 w-5" />
-                  <span className="sr-only">Facebook</span>
-                </Link>
-                <Link
-                  href="#"
-                  className="text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white"
-                >
-                  <Twitter className="h-5 w-5" />
-                  <span className="sr-only">Twitter</span>
-                </Link>
-                <Link
-                  href="#"
-                  className="text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white"
-                >
-                  <Instagram className="h-5 w-5" />
-                  <span className="sr-only">Instagram</span>
-                </Link>
-                <Link
-                  href="#"
-                  className="text-muted-foreground dark:text-gray-400 hover:text-foreground dark:hover:text-white"
-                >
-                  <Linkedin className="h-5 w-5" />
-                  <span className="sr-only">LinkedIn</span>
-                </Link>
-              </div>
+              </nav>
+              <p className="text-base">
+                © {new Date().getFullYear()} MigrantConnect. {t.footer.rights}
+              </p>
             </div>
+            <p
+              aria-hidden="true"
+              className="mt-12 select-none whitespace-nowrap text-[13.2vw] font-extrabold leading-[0.8] tracking-[-0.05em] md:mt-16 xl:text-[11.5rem]"
+              style={{ fontStretch: "75%" }}
+            >
+              MigrantConnect
+            </p>
           </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+
+        <Dialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-2xl">{t.login.title}</DialogTitle>
+              <DialogDescription>{t.login.description}</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => handleLogin("worker")}
+                className="flex h-32 flex-col items-start justify-between bg-signal p-4 text-left font-semibold text-ink transition-transform duration-150 hover:-translate-y-0.5"
+              >
+                <HardHat className="h-7 w-7" aria-hidden="true" />
+                {t.login.worker}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleLogin("employer")}
+                className="flex h-32 flex-col items-start justify-between bg-ink p-4 text-left font-semibold text-white transition-transform duration-150 hover:-translate-y-0.5"
+              >
+                <Building2 className="h-7 w-7" aria-hidden="true" />
+                {t.login.employer}
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </MotionConfig>
   )
 }

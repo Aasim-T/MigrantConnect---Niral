@@ -1,11 +1,4 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { LandingPage } from "@/components/landing-page"
-import { motion, AnimatePresence } from "framer-motion"
 
 export default function Home() {
   const router = useRouter()
@@ -13,6 +6,7 @@ export default function Home() {
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
 
   useEffect(() => {
+    // Check if language is already selected
     const storedLanguage = localStorage.getItem("preferredLanguage")
     if (storedLanguage) {
       setSelectedLanguage(storedLanguage)
@@ -32,7 +26,7 @@ export default function Home() {
       <AnimatePresence>
         {showLanguageSelector && (
           <Dialog open={showLanguageSelector} onOpenChange={setShowLanguageSelector}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md" hideClose>
               <motion.div
                 className="flex flex-col items-center justify-center space-y-6 py-6"
                 initial={{ opacity: 0, scale: 0.9 }}

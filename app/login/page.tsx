@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { api } from "@/lib/api"
+import { RailField } from "@/components/rail-field"
 
 type Role = "worker" | "employer"
 
@@ -165,24 +166,32 @@ function LoginTabs() {
 
 export default function LoginPage() {
   return (
-    <div className="container flex min-h-screen w-screen flex-col items-center justify-center py-12">
-      <Link
-        href="/"
-        className="absolute left-4 top-4 md:left-8 md:top-8 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to home
-      </Link>
+    <div className="mc-landing grid min-h-screen bg-white text-ink lg:grid-cols-2">
+      <aside className="relative isolate flex min-h-[220px] flex-col justify-between overflow-hidden bg-signal p-4 md:p-8 lg:min-h-screen">
+        <RailField className="absolute inset-x-0 bottom-0 -z-10 h-[55%]" convergeX={2} tracks={7} />
+        <Link href="/" className="inline-flex w-fit items-center gap-2 text-lg font-extrabold tracking-tight" style={{ fontStretch: "88%" }}>
+          <ArrowLeft className="h-5 w-5" aria-hidden="true" />
+          MigrantConnect
+        </Link>
+        <p
+          className="mt-10 hidden max-w-[12ch] text-4xl font-extrabold lg:block leading-[0.95] tracking-[-0.03em] md:text-6xl lg:mb-[58vh]"
+          style={{ fontStretch: "82%" }}
+        >
+          Your work, on record.
+        </p>
+      </aside>
 
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[380px]">
-        <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome to MigrantConnect</h1>
-          <p className="text-sm text-muted-foreground">Login using your Aadhaar number</p>
+      <main className="flex items-center justify-center px-4 py-12 md:px-8">
+        <div className="flex w-full max-w-[420px] flex-col space-y-8">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-extrabold tracking-[-0.02em] md:text-4xl">Log in</h1>
+            <p className="text-base text-muted-foreground">We send a one-time password to the phone linked to your Aadhaar.</p>
+          </div>
+          <Suspense>
+            <LoginTabs />
+          </Suspense>
         </div>
-        <Suspense>
-          <LoginTabs />
-        </Suspense>
-      </div>
+      </main>
     </div>
   )
 }
