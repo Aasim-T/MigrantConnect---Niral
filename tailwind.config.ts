@@ -10,7 +10,14 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			sans: ['var(--font-archivo)', 'var(--font-tamil)', 'var(--font-devanagari)', 'system-ui', 'sans-serif']
+  		},
   		colors: {
+  			signal: 'hsl(var(--signal))',
+  			ink: 'hsl(var(--ink))',
+  			coach: 'hsl(var(--coach))',
+  			paper: 'hsl(var(--paper))',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
